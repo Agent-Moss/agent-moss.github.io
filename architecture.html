@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>系统架构 — AgentMoss</title>
+  <meta name="description" content="AgentMoss 双层安全检测模型，事件管道流程，核心组件引擎。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html" class="active">架构</a></li>
+      <li><a href="detection.html">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="index.html" class="sidebar-back">← 返回首页</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#dual-model" class="sidebar-item active">双层检测模型</a></li>
+        <li><a href="#event-pipeline" class="sidebar-item">事件管道流程</a></li>
+        <li><a href="#trust-model" class="sidebar-item">数据信任模型</a></li>
+        <li><a href="#components" class="sidebar-item">核心组件</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <!-- Dual Model -->
+      <section class="detail-section" id="dual-model">
+        <div class="detail-section-tag">系统架构</div>
+        <h2 class="detail-section-title">双层安全检测模型</h2>
+        <p class="detail-section-desc">AgentMoss 采用双层安全检测模型，第一类快速单点检测零时延覆盖已知威胁模式，第二类全链路行为分析捕获组合安全威胁。</p>
+
+        <div class="arch-diagram">┌─────────────────────────────────────────────────────────────────┐
+│                     AI Agent 运行时 (OpenClaw)                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │ 用户会话  │  │ LLM 调用  │  │ 工具执行  │  │ 消息流/子Agent│   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘   │
+│       └──────┬──────┴──────┬──────┘────────────────┘            │
+│         Plugin Hook Points (29 个 Hook)                         │
+└──────────────┼─────────────┼────────────────────────────────────┘
+               │             │
+     ┌─────────▼─────────────▼─────────┐
+     │    OpenClaw Plugin (index.ts)    │
+     │  ┌───────────┐ ┌──────────────┐  │
+     │  │ 干预 Hook  │ │ 观察 Hook    │  │
+     │  │ 8个同步    │ │ 12个异步     │  │
+     │  │ 检查+阻断  │ │ 事件转发     │  │
+     │  └─────┬─────┘ └──────┬───────┘  │
+     └────────┼──────────────┼──────────┘
+              │              │
+    ┌─────────▼──────────────▼──────────────────────────────────┐
+    │              AgentMoss Service (:19876)                 │
+    │                                                        │
+    │  ┌──────────────┐  ┌──────────────────────────────────┐ │
+    │  │  HTTP Router  │  │  Event Ingest Pipeline           │ │
+    │  │  POST /api    │  │  防御过滤 → 标准化+存储           │ │
+    │  │  /hook/check  │  └──────────────────────────────────┘ │
+    │  │  /tool-call/  │  ┌──────────────────────────────────┐ │
+    │  │  /check       │  │  Security Engine (安全引擎)       │ │
+    │  └──────────────┘  │  L1: 单点行为规则 (91条规则)       │ │
+    │                    │  L2: 长行为链规则                  │ │
+    │                    │    L2.1: PDG+行为链+全局 (24条)   │ │
+    │                    │    L2.2: 模型检测 (待添加)        │ │
+    │                    │  L3: 语义规则 (待添加)             │ │
+    │                    └──────────────────────────────────┘ │
+    │  ┌─────────────────────────────────────────────────────┐ │
+    │  │  Storage: Memory / SQLite+JSONL / Run Summaries     │ │
+    │  └─────────────────────────────────────────────────────┘ │
+    └──────────────────────────┬────────────────────────────────┘
+                               │ SSE
+                    ┌──────────▼──────────┐
+                    │    Web Dashboard     │
+                    └─────────────────────┘</div>
+
+        <div class="callout">
+          <div class="callout-title">关键洞察：组合威胁</div>
+          <p>有些行为单独看是安全的，但组合起来构成威胁。行为 A: 读取 .env 文件 → L1 检测: allow ✅；行为 B: POST 到外部 URL → L1 检测: allow ✅；A;B 组合: 凭证外泄 → L2.1 PDG 检测: BLOCK 🚨</p>
+        </div>
+      </section>
+
+      <!-- Event Pipeline -->
+      <section class="detail-section" id="event-pipeline">
+        <div class="detail-section-tag">事件管道</div>
+        <h2 class="detail-section-title">事件管道流程</h2>
+        <p class="detail-section-desc">干预 Hook 同步执行阻断，观察 Hook 异步采集分析，两类 Hook 协同构建完整安全监控链路。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="layer-badge layer-l1">L1 同步</span>
+            <h3 style="margin-top: 12px;">干预 Hook（同步检查+阻断）</h3>
+            <p>before_tool_call 等干预类 Hook 同步执行，第一类正则规则 + 第二类 PDG 评估，返回 block / allow / requireApproval。</p>
+            <ul>
+              <li>before_tool_call → 工具调用策略检查</li>
+              <li>message_sending → 凭证泄露检测</li>
+              <li>tool_result_persist → 扩展密钥+注入检测</li>
+              <li>subagent_spawning → 凭证外发检测</li>
+              <li>before_install → 安装安全扫描</li>
+            </ul>
+          </div>
+          <div class="card">
+            <span class="layer-badge layer-l2">L2 异步</span>
+            <h3 style="margin-top: 12px;">观察 Hook（异步事件记录）</h3>
+            <p>观察类 Hook 异步采集事件，进行事件标准化、存储写入、行为图/PDG 增量更新、全局关联分析、SSE 广播。</p>
+            <ul>
+              <li>llm_input / llm_output → 模型输入输出</li>
+              <li>after_tool_call → 工具结果观察</li>
+              <li>session_start/end → 会话生命周期</li>
+              <li>message_received/sent → 消息流</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trust Model -->
+      <section class="detail-section" id="trust-model">
+        <div class="detail-section-tag">信任模型</div>
+        <h2 class="detail-section-title">数据信任模型</h2>
+        <p class="detail-section-desc">AgentMoss 为每个事件标注来源信任级别（SourceTrust），用于安全 PDG 的完整性评估。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>信任级别</th><th>来源</th><th>完整性评估</th></tr></thead>
+            <tbody>
+              <tr><td><code>system</code></td><td>Agent 运行时自身</td><td>高 — 系统生成，可信</td></tr>
+              <tr><td><code>user</code></td><td>用户直接输入</td><td>高 — 来自信任通道</td></tr>
+              <tr><td><code>llm</code></td><td>大模型输出</td><td>中 — 可能被 Prompt 注入篡改</td></tr>
+              <tr><td><code>tool</code></td><td>工具执行结果</td><td>低 — 外部系统输出，不可信</td></tr>
+              <tr><td><code>external</code></td><td>外部内容/网络</td><td>低 — 不可控来源</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Core Components -->
+      <section class="detail-section" id="components">
+        <div class="detail-section-tag">核心组件</div>
+        <h2 class="detail-section-title">六大核心引擎</h2>
+        <p class="detail-section-desc">从事件摄入到安全决策，六大引擎协同工作，构建完整的 Agent 行为安全监控链路。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-icon">📡</span>
+            <h3>Event Ingest Pipeline</h3>
+            <p>事件摄入管道，防御过滤（丢弃 assistant 流噪声，事件量减少 ~90%），事件标准化，存储写入。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/ingest/</code></p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔍</span>
+            <h3>Policy Engine</h3>
+            <p>策略引擎，L1 单点行为规则核心。91 条正则规则，覆盖 12 个 ATLAS Tactic。零时延同步返回 block/approval 决策。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>rules.ts</code> · <code>hooks.ts</code> · <code>behavior-chain.ts</code></p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🧬</span>
+            <h3>Security PDG</h3>
+            <p>安全程序依赖图，L2.1 数据流检测核心。基于 AgentArmor 论文实现 PDG 图构建 + 安全标签格传播 + 16 条违规检测规则 + 行为链 7 条 + 全局关联 1 条。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>pdg.ts</code> (1090行) · <code>registry.ts</code> (359行)</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔗</span>
+            <h3>Graph & Correlation</h3>
+            <p>行为图构建 + 证据链追溯 + 全局关联分析。CFG 控制流可视化，跨会话攻击链检测。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/graph/</code> · <code>src/correlation/</code></p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🖥️</span>
+            <h3>Web Dashboard</h3>
+            <p>SSE 实时推送 + 三栏布局仪表盘。6 个视图：全链路行为、单点检查、工具监控、Skill 监控、Token 分析、风险事件。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/ui/</code></p>
+          </div>
+          <div class="card">
+            <span class="card-icon">💾</span>
+            <h3>Storage Layer</h3>
+            <p>存储层支持 Memory（开发调试）和 SQLite+JSONL（生产部署）。运行标题智能推导。</p>
+            <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/store/</code></p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

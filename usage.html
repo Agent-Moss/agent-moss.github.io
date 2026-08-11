@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>使用指南 — AgentMoss</title>
+  <meta name="description" content="AgentMoss 安装启动、OpenClaw 配置、API 接口文档。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html">架构</a></li>
+      <li><a href="detection.html">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html" class="active">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="index.html" class="sidebar-back">← 返回首页</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#install" class="sidebar-item active">安装启动</a></li>
+        <li><a href="#config" class="sidebar-item">OpenClaw 配置</a></li>
+        <li><a href="#api" class="sidebar-item">API 接口</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <!-- Install -->
+      <section class="detail-section" id="install">
+        <div class="detail-section-tag">使用指南</div>
+        <h2 class="detail-section-title">安装启动</h2>
+        <p class="detail-section-desc">三步部署 AgentMoss 监控服务，接入 OpenClaw Agent 运行时。</p>
+
+        <h3>启动 AgentMoss 服务</h3>
+        <div class="code-block"><span class="comment"># 克隆项目</span>
+git clone https://github.com/Agent-Moss/agentmoss.git
+<span class="keyword">cd</span> agentmoss/agentmoss-demo
+
+<span class="comment"># 安装依赖</span>
+pnpm install
+
+<span class="comment"># 启动监控服务</span>
+pnpm dev
+
+<span class="comment"># 服务启动在 http://127.0.0.1:19876</span>
+<span class="comment"># 打开浏览器访问 http://127.0.0.1:19876 查看 Dashboard</span></div>
+
+        <h3>运行测试</h3>
+        <div class="code-block">pnpm test        <span class="comment"># 运行所有测试 (26 个测试文件)</span>
+pnpm typecheck   <span class="comment"># TypeScript 类型检查</span></div>
+
+        <h3>环境变量</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>变量</th><th>默认值</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>AGENTMOSS_HOST</code></td><td>127.0.0.1</td><td>监听地址</td></tr>
+              <tr><td><code>AGENTMOSS_PORT</code></td><td>19876</td><td>监听端口</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Config -->
+      <section class="detail-section" id="config">
+        <div class="detail-section-tag">配置</div>
+        <h2 class="detail-section-title">OpenClaw Plugin 配置</h2>
+        <p class="detail-section-desc">在 OpenClaw 运行时中配置 AgentMoss Plugin，连接到监控服务。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>配置项</th><th>默认值</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>enabled</code></td><td>true</td><td>启用监控</td></tr>
+              <tr><td><code>monitorUrl</code></td><td>http://127.0.0.1:19876</td><td>AgentMoss 服务地址</td></tr>
+              <tr><td><code>timeoutMs</code></td><td>80</td><td>干预检查超时（ms）</td></tr>
+              <tr><td><code>failClosedOnError</code></td><td>true</td><td>故障时阻断（推荐开启）</td></tr>
+              <tr><td><code>observeHooks</code></td><td>true</td><td>采集观察类事件</td></tr>
+              <tr><td><code>auditOnly</code></td><td>false</td><td>仅审计模式（不阻断）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Fail-Closed 模式</div>
+          <p>当 <code>failClosedOnError=true</code> 时，如果 AgentMoss 服务不可用，所有干预类 Hook 将返回 block 决策，确保安全监控失效时不会静默放行危险操作。</p>
+        </div>
+      </section>
+
+      <!-- API -->
+      <section class="detail-section" id="api">
+        <div class="detail-section-tag">API</div>
+        <h2 class="detail-section-title">API 接口</h2>
+        <p class="detail-section-desc">AgentMoss 监控服务提供 13 个 HTTP 接口，覆盖事件摄入、策略检查、行为图、安全 PDG 等。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>GET</td><td><code>/</code></td><td>主监控仪表盘</td></tr>
+              <tr><td>GET</td><td><code>/api/health</code></td><td>健康检查</td></tr>
+              <tr><td>POST</td><td><code>/api/events</code></td><td>事件摄入</td></tr>
+              <tr><td>GET</td><td><code>/api/events</code></td><td>事件列表（支持 runId 过滤）</td></tr>
+              <tr><td>GET</td><td><code>/api/events/stream</code></td><td>SSE 实时事件流</td></tr>
+              <tr><td>POST</td><td><code>/api/tool-call/check</code></td><td>工具调用策略检查</td></tr>
+              <tr><td>POST</td><td><code>/api/hook/check</code></td><td>干预 Hook 检查</td></tr>
+              <tr><td>GET</td><td><code>/api/runs</code></td><td>运行会话列表</td></tr>
+              <tr><td>GET</td><td><code>/api/runs/:runId/graph</code></td><td>行为图</td></tr>
+              <tr><td>GET</td><td><code>/api/runs/:runId/security-pdg</code></td><td>安全 PDG</td></tr>
+              <tr><td>GET</td><td><code>/api/runs/:runId/evidence?eventId=</code></td><td>证据链</td></tr>
+              <tr><td>GET</td><td><code>/api/global/findings</code></td><td>跨会话攻击链</td></tr>
+              <tr><td>GET</td><td><code>/api/token-usage</code></td><td>Token 消耗报告</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>
