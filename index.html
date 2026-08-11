@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentMoss — AI Agent 全链路运行时安全监控框架</title>
+  <meta name="description" content="AgentMoss 是面向 AI Agent 运行时的侧信道安全监控框架，通过 Hook 插桩实现全链路行为观测与实时安全干预。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="#" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="#overview" class="active">概览</a></li>
+      <li><a href="#architecture">架构</a></li>
+      <li><a href="#detection">检测方法</a></li>
+      <li><a href="#rules">规则集</a></li>
+      <li><a href="#usage">使用指南</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">v0.1.0 · TypeScript · 零外部依赖 · Observe-Only</div>
+  <h1>AgentMoss<span class="sub">AI Agent 全链路运行时安全监控框架</span></h1>
+  <p>通过 Agent 运行时的 Plugin Hook 点实现对 Agent 行为的全链路观测与实时安全干预。不侵入 Agent 逻辑，纵深防御，Fail-Closed。</p>
+  <div class="hero-actions">
+    <a href="#architecture" class="btn-primary">了解架构</a>
+    <a href="#usage" class="btn-secondary">快速开始</a>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-value">121</div><div class="stat-label">安全规则总数</div></div>
+  <div class="stat-item"><div class="stat-value">29</div><div class="stat-label">Hook 覆盖点</div></div>
+  <div class="stat-item"><div class="stat-value">5</div><div class="stat-label">检测层级</div></div>
+  <div class="stat-item"><div class="stat-value">&lt;100ms</div><div class="stat-label">单次检测延迟</div></div>
+  <div class="stat-item"><div class="stat-value">0</div><div class="stat-label">Token 消耗</div></div>
+</div>
+
+<!-- Overview -->
+<section class="section" id="overview">
+  <div class="section-inner">
+    <div class="section-tag">概览</div>
+    <h2 class="section-title">为什么需要 AgentMoss</h2>
+    <p class="section-desc">AI Agent 拥有执行 shell 命令、读写文件、发送网络请求等高权限能力。一旦被 Prompt 注入攻击，Agent 可能被诱导执行破坏性操作或泄露敏感数据。AgentMoss 在 Agent 运行时旁边架设监控，不侵入 Agent 逻辑，实时检测并阻断危险行为。</p>
+
+    <div class="cards-grid">
+      <div class="card">
+        <span class="card-icon">🛡️</span>
+        <h3>不侵入 Agent 逻辑</h3>
+        <p>纯观测式插桩（side-channel），通过 Agent 运行时提供的 Plugin Hook 点采集事件，Agent 核心执行路径零修改。</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🔒</span>
+        <h3>Fail-Closed</h3>
+        <p>监控服务不可用时自动阻断危险操作，避免安全系统失效后静默放行。确保安全监控的可靠性。</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🏗️</span>
+        <h3>纵深防御</h3>
+        <p>L1 单点检测 + L2 行为链 + L3 PDG 数据流 + L4 全局关联，四层检测互补，覆盖从单条命令到跨会话攻击链。</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">⚡</span>
+        <h3>实时干预</h3>
+        <p>第一类检测零时延（单事件即时判断 &lt;100ms），第二类检测异步分析。PDG 桥接两层，实现异步分析结果同步阻断。</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">📊</span>
+        <h3>全链路可观测</h3>
+        <p>SSE 实时推送、Web Dashboard 行为树可视化、证据链追溯、Token 用量统计。每个安全决策附带完整证据路径。</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🔧</span>
+        <h3>多运行时适配</h3>
+        <p>当前适配 OpenClaw 运行时，通过 Adapter 机制支持 Hermes、JiuWenClaw 等其他 Agent 运行时。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section class="section" id="architecture">
+  <div class="section-inner">
+    <div class="section-tag">系统架构</div>
+    <h2 class="section-title">双层安全检测模型</h2>
+    <p class="section-desc">AgentMoss 采用双层安全检测模型，第一类快速单点检测零时延覆盖已知威胁模式，第二类全链路行为分析捕获组合安全威胁。</p>
+
+    <div class="arch-diagram">┌─────────────────────────────────────────────────────────────────┐
+│                     AI Agent 运行时 (OpenClaw)                   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
+│  │ 用户会话  │  │ LLM 调用  │  │ 工具执行  │  │ 消息流/子Agent│   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬───────┘   │
+│       └──────┬──────┴──────┬──────┘────────────────┘            │
+│         Plugin Hook Points (29 个 Hook)                         │
+└──────────────┼─────────────┼────────────────────────────────────┘
+               │             │
+     ┌─────────▼─────────────▼─────────┐
+     │    OpenClaw Plugin (index.ts)    │
+     │  ┌───────────┐ ┌──────────────┐  │
+     │  │ 干预 Hook  │ │ 观察 Hook    │  │
+     │  │ 8个同步    │ │ 12个异步     │  │
+     │  │ 检查+阻断  │ │ 事件转发     │  │
+     │  └─────┬─────┘ └──────┬───────┘  │
+     └────────┼──────────────┼──────────┘
+              │              │
+    ┌─────────▼──────────────▼──────────────────────────────────┐
+    │              AgentMoss Service (:19876)                 │
+    │                                                        │
+    │  ┌──────────────┐  ┌──────────────────────────────────┐ │
+    │  │  HTTP Router  │  │  Event Ingest Pipeline           │ │
+    │  │  POST /api    │  │  防御过滤 → 标准化+存储           │ │
+    │  │  /hook/check  │  └──────────────────────────────────┘ │
+    │  │  /tool-call/  │  ┌──────────────────────────────────┐ │
+    │  │  /check       │  │  Security Engine (安全引擎)       │ │
+    │  └──────────────┘  │  L1: 快速单点检测 (91条规则)       │ │
+    │                    │  L2: 行为链检测 (7条攻击链)        │ │
+    │                    │  L3: 安全 PDG (16条违规规则)       │ │
+    │                    │  L4: 全局关联 (跨会话攻击链)       │ │
+    │                    └──────────────────────────────────┘ │
+    │  ┌─────────────────────────────────────────────────────┐ │
+    │  │  Storage: Memory / SQLite+JSONL / Run Summaries     │ │
+    │  └─────────────────────────────────────────────────────┘ │
+    └──────────────────────────┬────────────────────────────────┘
+                               │ SSE
+                    ┌──────────▼──────────┐
+                    │    Web Dashboard     │
+                    └─────────────────────┘</div>
+
+    <div class="callout">
+      <div class="callout-title">关键洞察：组合威胁</div>
+      <p>有些行为单独看是安全的，但组合起来构成威胁。行为 A: 读取 .env 文件 → L1 检测: allow ✅；行为 B: POST 到外部 URL → L1 检测: allow ✅；A;B 组合: 凭证外泄 → L3 PDG 检测: BLOCK 🚨</p>
+    </div>
+
+    <h3 style="margin-top: 40px;">事件管道流程</h3>
+    <div class="cards-grid" style="margin-top: 24px;">
+      <div class="card">
+        <span class="layer-badge layer-l1">L1 同步</span>
+        <h3 style="margin-top: 12px;">干预 Hook（同步检查+阻断）</h3>
+        <p>before_tool_call 等干预类 Hook 同步执行，第一类正则规则 + 第二类 PDG 评估，返回 block / allow / requireApproval。</p>
+        <ul>
+          <li>before_tool_call → 工具调用策略检查</li>
+          <li>message_sending → 凭证泄露检测</li>
+          <li>tool_result_persist → 扩展密钥+注入检测</li>
+          <li>subagent_spawning → 凭证外发检测</li>
+          <li>before_install → 安装安全扫描</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="layer-badge layer-l2">L2 异步</span>
+        <h3 style="margin-top: 12px;">观察 Hook（异步事件记录）</h3>
+        <p>观察类 Hook 异步采集事件，进行事件标准化、存储写入、行为图/PDG 增量更新、全局关联分析、SSE 广播。</p>
+        <ul>
+          <li>llm_input / llm_output → 模型输入输出</li>
+          <li>after_tool_call → 工具结果观察</li>
+          <li>session_start/end → 会话生命周期</li>
+          <li>message_received/sent → 消息流</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 40px;">数据信任模型</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 16px;">AgentMoss 为每个事件标注来源信任级别（SourceTrust），用于安全 PDG 的完整性评估：</p>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>信任级别</th><th>来源</th><th>完整性评估</th></tr></thead>
+        <tbody>
+          <tr><td><code>system</code></td><td>Agent 运行时自身</td><td>高 — 系统生成，可信</td></tr>
+          <tr><td><code>user</code></td><td>用户直接输入</td><td>高 — 来自信任通道</td></tr>
+          <tr><td><code>llm</code></td><td>大模型输出</td><td>中 — 可能被 Prompt 注入篡改</td></tr>
+          <tr><td><code>tool</code></td><td>工具执行结果</td><td>低 — 外部系统输出，不可信</td></tr>
+          <tr><td><code>external</code></td><td>外部内容/网络</td><td>低 — 不可控来源</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- Core Components -->
+<section class="section" id="components">
+  <div class="section-inner">
+    <div class="section-tag">核心组件</div>
+    <h2 class="section-title">五大核心引擎</h2>
+    <p class="section-desc">从事件摄入到安全决策，五大引擎协同工作，构建完整的 Agent 行为安全监控链路。</p>
+
+    <div class="cards-grid">
+      <div class="card">
+        <span class="card-icon">📡</span>
+        <h3>Event Ingest Pipeline</h3>
+        <p>事件摄入管道，负责接收 Hook 转发的事件。防御过滤（丢弃 assistant 流噪声，事件量减少 ~90%），事件标准化（normalizeEvent），存储写入。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/ingest/</code></p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🔍</span>
+        <h3>Policy Engine</h3>
+        <p>策略引擎，L1 单点检测核心。91 条正则规则（rules.ts 80 条 + hooks.ts 11 条），覆盖 12 个 ATLAS Tactic。零时延同步返回 block/approval 决策。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/policy/rules.ts</code> · <code>hooks.ts</code> · <code>behavior-chain.ts</code></p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🧬</span>
+        <h3>Security PDG</h3>
+        <p>安全程序依赖图，L3 数据流检测核心。基于 AgentArmor 论文实现 PDG 图构建 + 安全标签格传播 + 16 条违规检测规则。9 种细粒度节点类型。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/security/pdg.ts</code> (1090行) · <code>registry.ts</code> (359行)</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🔗</span>
+        <h3>Graph & Correlation</h3>
+        <p>行为图构建 + 证据链追溯 + 全局关联分析。CFG 控制流可视化，跨会话攻击链检测（recon→sensitive_read→staging→egress）。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/graph/</code> · <code>src/correlation/</code></p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🖥️</span>
+        <h3>Web Dashboard</h3>
+        <p>SSE 实时推送 + 三栏布局仪表盘。6 个视图：全链路行为、单点检查、工具监控、Skill 监控、Token 分析、风险事件。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/ui/</code></p>
+      </div>
+      <div class="card">
+        <span class="card-icon">💾</span>
+        <h3>Storage Layer</h3>
+        <p>存储层支持 Memory（开发调试）和 SQLite+JSONL（生产部署）。运行标题智能推导，避免默认"新建会话"。</p>
+        <p style="margin-top: 8px;"><strong>源文件：</strong> <code>src/store/</code></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Detection Methods -->
+<section class="section" id="detection">
+  <div class="section-inner">
+    <div class="section-tag">检测方法</div>
+    <h2 class="section-title">五层混合检测体系</h2>
+    <p class="section-desc">从单条命令的模式匹配到跨会话攻击链的关联分析，五层检测互补覆盖，逐层提升绕过难度。</p>
+
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>层级</th><th>方法</th><th>说明</th><th>绕过难度</th></tr></thead>
+        <tbody>
+          <tr><td><span class="layer-badge layer-l1">L1</span></td><td>模式匹配 (Pattern Match)</td><td>基于正则的单步静态检测，fast-path 初筛</td><td>低</td></tr>
+          <tr><td><span class="layer-badge layer-l2">L2</span></td><td>行为链检测 (Behavior Chain)</td><td>跨步骤时序序列分析（download→execute, download→persist）</td><td>中</td></tr>
+          <tr><td><span class="layer-badge layer-l3">L3</span></td><td>PDG 数据流 (Data Flow)</td><td>基于污点传播的高敏感数据流向追踪，正则打标签→图论标签传播→拓扑违规判定</td><td>较高</td></tr>
+          <tr><td><span class="layer-badge layer-l4">L4</span></td><td>全局关联 (Cross-Run)</td><td>跨 runId/session 多会话攻击链分析</td><td>高</td></tr>
+          <tr><td><span class="layer-badge" style="background: rgba(63,185,80,0.15); color: var(--success);">L5</span></td><td>语义意图 (Semantic)</td><td>LLM 辅助意图解析（规划中）</td><td>最高</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- PDG Detection Deep Dive -->
+    <div class="tabs" style="margin-top: 40px;">
+      <button class="tab active" data-tab="0">PDG 三层混合机制</button>
+      <button class="tab" data-tab="1">9 种节点类型</button>
+      <button class="tab" data-tab="2">安全标签系统</button>
+      <button class="tab" data-tab="3">格传播规则</button>
+    </div>
+
+    <div class="tab-panel active">
+      <h3>PDG 检测还是模式匹配吗？</h3>
+      <div class="callout">
+        <div class="callout-title">结论先行</div>
+        <p>不是纯模式匹配，而是"正则打标签 → 图论标签传播 → 拓扑违规判定"的三层混合机制。正则只在第 1 层用于标记节点属性，真正的检测能力来自第 2 层标签传播和第 3 层图拓扑分析。</p>
+      </div>
+      <div class="arch-diagram">第 1 层：正则打标签 (Labeling)                    第 2 层：图论标签传播 (Propagation)
+detectSensitiveKinds() / hasPromptInjection()    joinConfidentiality() = max(a, b)
+→ 给每个 PDG 节点赋予 confidentiality/integrity/   joinIntegrity()       = min(a, b)
+  sensitiveKinds 初始安全标签                       sensitiveKinds        = 并集
+                                                  → 沿数据依赖边传播标签
+
+         第 3 层：拓扑违规判定 (Inspection)
+         inspectSecurityPdg() — 16 条规则
+         → 标签比较 / 边类型检查 / BFS 遍历 /
+           数据源计数 / 兄弟节点对比 → 安全决策</div>
+      <p style="color: var(--text-secondary); margin-top: 16px;">第 3 层使用 6 种拓扑分析方法：标签比较、边类型检查、BFS 遍历、数据源计数、兄弟节点对比、参数内容匹配（仅用于精确化降级误报）。正则在 PDG 中不是"检测引擎"，而是"标签器"——检测决策完全由图拓扑分析完成。</p>
+    </div>
+
+    <div class="tab-panel">
+      <h3>PDG 9 种细粒度节点类型</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">基于 AgentArmor 论文 (arXiv 2508.01249)，每条事件按类型分解为多个细粒度子节点，实现子事件级数据流追踪。</p>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>节点类型</th><th>简写</th><th>来源事件</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>system_prompt</code></td><td>SP</td><td>llm_input (system)</td><td>系统级初始输入</td></tr>
+            <tr><td><code>user_prompt</code></td><td>UP</td><td>llm_input (user)</td><td>用户输入的命令或查询</td></tr>
+            <tr><td><code>llm_response</code></td><td>LLM</td><td>llm_output</td><td>模型输出（文本或工具调用决策）</td></tr>
+            <tr><td><code>llm_thought</code></td><td>TH</td><td>llm_output (reasoning)</td><td>Agent 内部思考</td></tr>
+            <tr><td><code>tool_name</code></td><td>TN</td><td>tool_call 分解</td><td>选择的工具名（如 file.read）</td></tr>
+            <tr><td><code>tool_param</code></td><td>TP</td><td>tool_call 分解</td><td>单个工具参数（文件路径、URL、命令等）</td></tr>
+            <tr><td><code>tool_action</code></td><td>T</td><td>tool_call 分解</td><td>工具执行动作本身</td></tr>
+            <tr><td><code>observation</code></td><td>OBS</td><td>tool_result 分解</td><td>工具返回结果</td></tr>
+            <tr><td><code>data</code></td><td>D</td><td>tool_result 分解</td><td>从 OBS 中提取的敏感数据节点</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>安全标签系统</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">每个 PDG 节点携带一个 SecurityLabel，包含四个维度的安全属性：</p>
+      <div class="code-block"><span class="type">type</span> <span class="type">SecurityLabel</span> = {
+  <span class="function">confidentiality</span>: <span class="string">"low" | "medium" | "high"</span>;  <span class="comment">// 机密性</span>
+  <span class="function">integrity</span>:       <span class="string">"low" | "medium" | "high"</span>;  <span class="comment">// 完整性</span>
+  <span class="function">sensitiveKinds</span>:   <span class="type">string</span>[];                   <span class="comment">// 敏感类型标签</span>
+  <span class="function">actionClass</span>:      <span class="type">SecurityActionClass</span>;         <span class="comment">// 操作分类</span>
+};</div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>维度</th><th>取值</th><th>语义</th></tr></thead>
+          <tbody>
+            <tr><td>Confidentiality</td><td>high / medium / low</td><td>检测到 API Token、密码、私钥、.env、PII → high；工具输出 → medium；其他 → low</td></tr>
+            <tr><td>Integrity</td><td>high / medium / low</td><td>system/user → high；llm → medium；tool/external → low（含注入则强制 low）</td></tr>
+            <tr><td>sensitiveKinds</td><td>数组</td><td>api_token, credential, private_key, dotenv_secret, pii_financial, prompt_injection</td></tr>
+            <tr><td>actionClass</td><td>枚举</td><td>read, write, network_egress, message_egress, compute, unknown</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>格传播规则 (Lattice Propagation)</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">基于安全格理论，沿数据依赖边传播标签。机密性取高（高处流原则），完整性取低（低处流原则）。</p>
+      <div class="callout">
+        <div class="callout-title">机密性取 max（高处流原则）</div>
+        <p>一个节点只要从任何一条路径接收到高机密数据，该节点就应被视为高机密。</p>
+      </div>
+      <div class="callout">
+        <div class="callout-title">完整性取 min（低处流原则）</div>
+        <p>一个节点只要从任何一条路径接收到低完整性数据，该节点就应被视为低完整性——不可信数据"污染"了下游。</p>
+      </div>
+      <div class="code-block"><span class="comment">// 机密性合并：取最高级别</span>
+<span class="function">joinConfidentiality</span>(left, right) = confidentialityRank[left] >= right ? left : right;
+
+<span class="comment">// 完整性合并：取最低级别</span>
+<span class="function">joinIntegrity</span>(left, right) = integrityRank[left] <= right ? left : right;
+
+<span class="comment">// 敏感类型合并：取并集</span>
+sensitiveKinds = unique([...left, ...right]);</div>
+      <p style="color: var(--text-secondary); margin-top: 16px;">传播路径：Parent OBS → Child UP/SP（注入检测关键路径）、Parent OBS/D → Child TP（数据外传检测关键路径）、Parent LLM → Child T（控制流依赖）等。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Rules -->
+<section class="section" id="rules">
+  <div class="section-inner">
+    <div class="section-tag">规则集</div>
+    <h2 class="section-title">121 条安全规则 · 5 层覆盖</h2>
+    <p class="section-desc">基于 MITRE ATLAS + ATT&CK 威胁建模，覆盖 12 个攻击战术类别。</p>
+
+    <div class="stats-bar" style="border: none; padding: 24px 0; margin-bottom: 32px;">
+      <div class="stat-item"><div class="stat-value" style="color: var(--warning);">91</div><div class="stat-label">L1 单点规则</div></div>
+      <div class="stat-item"><div class="stat-value" style="color: var(--info);">7</div><div class="stat-label">L2 行为链</div></div>
+      <div class="stat-item"><div class="stat-value" style="color: #bc6cd4;">16</div><div class="stat-label">L3 PDG 规则</div></div>
+      <div class="stat-item"><div class="stat-value" style="color: var(--text-secondary);">1</div><div class="stat-label">L4 全局关联</div></div>
+    </div>
+
+    <!-- Tabs for rule categories -->
+    <div class="tabs">
+      <button class="tab active" data-tab="0">L1 单点规则 (91条)</button>
+      <button class="tab" data-tab="1">L2 行为链 (7条)</button>
+      <button class="tab" data-tab="2">L3 PDG 规则 (16条)</button>
+      <button class="tab" data-tab="3">动作分布</button>
+    </div>
+
+    <div class="tab-panel active">
+      <h3>L1 单点规则 — 按 ATLAS Tactic 分布</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>ATLAS Tactic</th><th>规则数</th><th>占比</th><th>典型规则</th></tr></thead>
+          <tbody>
+            <tr><td>Defense Evasion (防御规避)</td><td>17</td><td>18.7%</td><td>base64-decode-exec, log-cleanup, setenforce-disable</td></tr>
+            <tr><td>Persistence (持久化)</td><td>14</td><td>15.4%</td><td>crontab-modification, shell-config-persistence, authorized-keys-write</td></tr>
+            <tr><td>Exfiltration (数据外传)</td><td>14</td><td>15.4%</td><td>network-egress-sensitive, encrypted-egress, outbound-secret-leak</td></tr>
+            <tr><td>Destruction / Impact (破坏)</td><td>14</td><td>15.4%</td><td>dangerous-shell-rm-root, fork-bomb, dd-disk-zero</td></tr>
+            <tr><td>Supply Chain / Execution (供应链/执行)</td><td>6</td><td>6.6%</td><td>pipe-downloaded-script, git-clone-execute, reverse-shell</td></tr>
+            <tr><td>Privilege Escalation (提权)</td><td>9</td><td>9.9%</td><td>sudo-privilege-escalation, setuid-setgid, container-privileged</td></tr>
+            <tr><td>Discovery (侦察)</td><td>3</td><td>3.3%</td><td>cloud-metadata-access, port-scan, dns-zone-transfer</td></tr>
+            <tr><td>Prompt Injection (提示注入)</td><td>4</td><td>4.4%</td><td>agent-run-prompt-injection, tool-result-injection-attempt</td></tr>
+            <tr><td>Credential Access (凭证访问)</td><td>4</td><td>4.4%</td><td>private-key-access, dotenv-file-access, password-store-access</td></tr>
+            <tr><td>Lateral Movement (横向移动)</td><td>2</td><td>2.2%</td><td>ssh-remote-connect, ssh-dynamic-tunnel</td></tr>
+            <tr><td>Collection (数据收集)</td><td>2</td><td>2.2%</td><td>archive-sensitive-path, path-traversal</td></tr>
+            <tr><td>Resource Development (资源开发)</td><td>1</td><td>1.1%</td><td>binary-path-write</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top: 16px;">
+        <div class="callout-title">动作分布</div>
+        <p>阻拦 (block): 24 条 (26.4%) · 询问 (approval): 67 条 (73.6%)。有误报风险的 44 条规则已从 block 降级为 approval，仅保留 16 条极高置信度规则为 block。</p>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>L2 行为链检测 — 7 条预定义攻击链</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>#</th><th>规则 ID</th><th>阶段序列</th><th>时间窗口</th><th>ATLAS Tactic</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>bfChain-download-execute</code></td><td>download → execute</td><td>5min</td><td>Execution</td></tr>
+            <tr><td>2</td><td><code>bfChain-download-persist</code></td><td>download → persist</td><td>10min</td><td>Persistence</td></tr>
+            <tr><td>3</td><td><code>bfChain-download-privesc-exec</code></td><td>download → privilege_escalation → execute</td><td>5min</td><td>Privilege Esc. + Execution</td></tr>
+            <tr><td>4</td><td><code>bfChain-collect-exfiltrate</code></td><td>sensitive_read → archive → egress</td><td>10min</td><td>Exfiltration</td></tr>
+            <tr><td>5</td><td><code>bfChain-disable-security-impact</code></td><td>disable_security → execute</td><td>5min</td><td>Defense Evasion + Impact</td></tr>
+            <tr><td>6</td><td><code>bfChain-credential-theft</code></td><td>sensitive_read → egress</td><td>5min</td><td>Credential Access + Exfiltration</td></tr>
+            <tr><td>7</td><td><code>bfChain-git-build-exec</code></td><td>download → execute</td><td>10min</td><td>Execution</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>L3 PDG 安全检测规则 — 16 条</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>#</th><th>规则 ID</th><th>动作</th><th>检测逻辑</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><code>high-confidentiality-public-egress</code></td><td><span class="badge badge-block">block</span></td><td>高机密数据流向网络/消息出口</td></tr>
+            <tr><td>2</td><td><code>low-integrity-controls-side-effect</code></td><td><span class="badge badge-block">block</span></td><td>低可信来源控制外传操作</td></tr>
+            <tr><td>3</td><td><code>high-confidentiality-write-to-public-path</code></td><td><span class="badge badge-observe">observe</span></td><td>高机密数据写入文件（暂存监控）</td></tr>
+            <tr><td>4</td><td><code>low-integrity-controls-write-operation</code></td><td><span class="badge badge-observe">observe</span></td><td>低可信来源控制文件写入</td></tr>
+            <tr><td>5</td><td><code>low-integrity-controls-command-exec</code></td><td><span class="badge badge-block">block</span></td><td>低可信来源控制 shell 命令</td></tr>
+            <tr><td>6</td><td><code>sensitive-data-staging-before-egress</code></td><td><span class="badge badge-block">block</span></td><td>外传前有 write/compute 暂存 + 敏感数据源</td></tr>
+            <tr><td>7</td><td><code>tool-result-injection-to-command</code></td><td><span class="badge badge-block">block</span></td><td>工具返回含注入 → 流向命令执行</td></tr>
+            <tr><td>8</td><td><code>unauthorized-indirect-execution</code></td><td><span class="badge badge-block">block</span></td><td>Transfer Execution 模式检测</td></tr>
+            <tr><td>9</td><td><code>observation-to-tool-name-flow</code></td><td><span class="badge badge-block">block</span></td><td>工具结果影响"调用哪个工具"</td></tr>
+            <tr><td>10</td><td><code>observation-to-tool-param-flow</code></td><td><span class="badge badge-block">block</span></td><td>工具结果影响"工具参数值"</td></tr>
+            <tr><td>11</td><td><code>sensitive-data-in-egress-param</code></td><td><span class="badge badge-block">block</span></td><td>外传参数含敏感数据</td></tr>
+            <tr><td>12</td><td><code>sensitive-data-aggregation</code></td><td><span class="badge badge-block">block</span></td><td>多源敏感数据汇聚外传</td></tr>
+            <tr><td>13</td><td><code>tool-name-spoofing</code></td><td><span class="badge badge-observe">observe</span></td><td>模型声称工具名 ≠ 实际调用工具名</td></tr>
+            <tr><td>14</td><td><code>observation-derived-shell-command</code></td><td><span class="badge badge-block">block</span></td><td>工具结果作为 shell 命令执行</td></tr>
+            <tr><td>15</td><td><code>prompt-injection-controls-egress</code></td><td><span class="badge badge-block">block</span></td><td>BFS 上游 4 跳内有注入标签</td></tr>
+            <tr><td>16</td><td><code>injection-source-data-exfiltration</code></td><td><span class="badge badge-block">block</span></td><td>注入导致敏感数据泄露</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top: 16px;">
+        <div class="callout-title">动作分布</div>
+        <p>始终 block: 9 条 (Rules 1, 5, 6, 7, 8, 11, 12, 14, 16) · 条件 block/observe: 4 条 (Rules 2, 9, 10, 15) · 始终 observe: 3 条 (Rules 3, 4, 13)</p>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>动作分布统计</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>动作</th><th>L1 单点</th><th>L2 行为链</th><th>L3 PDG</th><th>L4 全局</th><th>合计</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge badge-block">block</span></td><td>24</td><td>—</td><td>9</td><td>—</td><td>33</td></tr>
+            <tr><td><span class="badge badge-approval">approval</span></td><td>67</td><td>—</td><td>0</td><td>—</td><td>67</td></tr>
+            <tr><td><span class="badge badge-observe">observe</span></td><td>—</td><td>7</td><td>3</td><td>1</td><td>11</td></tr>
+            <tr><td><strong>合计</strong></td><td>91</td><td>7</td><td>16</td><td>1</td><td><strong>121</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Property Registry -->
+    <h3 style="margin-top: 48px;">属性注册表 (Property Registry)</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 16px;">为不在运行时轨迹中的工具元数据提供补充信息，包含工具注册表（61 个工具条目）和数据注册表（10 个数据类型）。</p>
+    <div class="cards-grid">
+      <div class="card">
+        <h3>Tool Registry (61 条目)</h3>
+        <p>5 个分组：通用工具 (20)、Banking 套件 (11)、Workspace 套件 (14)、Slack 套件 (8)、Travel 套件 (8)。每个条目包含数据流向、副作用、安全默认值。</p>
+        <ul>
+          <li><code>file.read</code> — read, conf=medium, integ=low</li>
+          <li><code>shell.run</code> — compute, reqHighIntegrity ✅</li>
+          <li><code>curl</code> — network_egress, integ=high</li>
+          <li><code>send_email</code> — message_egress, reqHighIntegrity ✅</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Data Registry (10 类型)</h3>
+        <p>为数据节点分配类型和默认安全标签。</p>
+        <ul>
+          <li><code>file_content</code> — conf=medium, integ=low</li>
+          <li><code>stdout</code> — conf=low, integ=low</li>
+          <li><code>credential</code> — conf=high, sensitiveByDefault ✅</li>
+          <li><code>config</code> — conf=high, integ=medium</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Usage -->
+<section class="section" id="usage">
+  <div class="section-inner">
+    <div class="section-tag">使用指南</div>
+    <h2 class="section-title">快速开始</h2>
+    <p class="section-desc">三步部署 AgentMoss 监控服务，接入 OpenClaw Agent 运行时。</p>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="0">安装启动</button>
+      <button class="tab" data-tab="1">配置</button>
+      <button class="tab" data-tab="2">API 接口</button>
+    </div>
+
+    <div class="tab-panel active">
+      <h3>启动 AgentMoss 服务</h3>
+      <div class="code-block"><span class="comment"># 克隆项目</span>
+git clone https://github.com/Agent-Moss/agentmoss.git
+<span class="keyword">cd</span> agentmoss/agentmoss-demo
+
+<span class="comment"># 安装依赖</span>
+pnpm install
+
+<span class="comment"># 启动监控服务</span>
+pnpm dev
+
+<span class="comment"># 服务启动在 http://127.0.0.1:19876</span>
+<span class="comment"># 打开浏览器访问 http://127.0.0.1:19876 查看 Dashboard</span></div>
+
+      <h3 style="margin-top: 24px;">运行测试</h3>
+      <div class="code-block">pnpm test        <span class="comment"># 运行所有测试 (26 个测试文件)</span>
+pnpm typecheck   <span class="comment"># TypeScript 类型检查</span></div>
+
+      <h3 style="margin-top: 24px;">环境变量</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>变量</th><th>默认值</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>AGENTMOSS_HOST</code></td><td>127.0.0.1</td><td>监听地址</td></tr>
+            <tr><td><code>AGENTMOSS_PORT</code></td><td>19876</td><td>监听端口</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>OpenClaw Plugin 配置</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>配置项</th><th>默认值</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>enabled</code></td><td>true</td><td>启用监控</td></tr>
+            <tr><td><code>monitorUrl</code></td><td>http://127.0.0.1:19876</td><td>AgentMoss 服务地址</td></tr>
+            <tr><td><code>timeoutMs</code></td><td>80</td><td>干预检查超时（ms）</td></tr>
+            <tr><td><code>failClosedOnError</code></td><td>true</td><td>故障时阻断（推荐开启）</td></tr>
+            <tr><td><code>observeHooks</code></td><td>true</td><td>采集观察类事件</td></tr>
+            <tr><td><code>auditOnly</code></td><td>false</td><td>仅审计模式（不阻断）</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top: 16px;">
+        <div class="callout-title">Fail-Closed 模式</div>
+        <p>当 <code>failClosedOnError=true</code> 时，如果 AgentMoss 服务不可用，所有干预类 Hook 将返回 block 决策，确保安全监控失效时不会静默放行危险操作。</p>
+      </div>
+    </div>
+
+    <div class="tab-panel">
+      <h3>API 接口</h3>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td>GET</td><td><code>/</code></td><td>主监控仪表盘</td></tr>
+            <tr><td>GET</td><td><code>/api/health</code></td><td>健康检查</td></tr>
+            <tr><td>POST</td><td><code>/api/events</code></td><td>事件摄入</td></tr>
+            <tr><td>GET</td><td><code>/api/events</code></td><td>事件列表（支持 runId 过滤）</td></tr>
+            <tr><td>GET</td><td><code>/api/events/stream</code></td><td>SSE 实时事件流</td></tr>
+            <tr><td>POST</td><td><code>/api/tool-call/check</code></td><td>工具调用策略检查</td></tr>
+            <tr><td>POST</td><td><code>/api/hook/check</code></td><td>干预 Hook 检查</td></tr>
+            <tr><td>GET</td><td><code>/api/runs</code></td><td>运行会话列表</td></tr>
+            <tr><td>GET</td><td><code>/api/runs/:runId/graph</code></td><td>行为图</td></tr>
+            <tr><td>GET</td><td><code>/api/runs/:runId/security-pdg</code></td><td>安全 PDG</td></tr>
+            <tr><td>GET</td><td><code>/api/runs/:runId/evidence?eventId=</code></td><td>证据链</td></tr>
+            <tr><td>GET</td><td><code>/api/global/findings</code></td><td>跨会话攻击链</td></tr>
+            <tr><td>GET</td><td><code>/api/token-usage</code></td><td>Token 消耗报告</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AARM Framework -->
+<section class="section" id="aarm">
+  <div class="section-inner">
+    <div class="section-tag">AARM 框架</div>
+    <h2 class="section-title">三层防御架构</h2>
+    <p class="section-desc">AgentMoss 是 AARM (Agent Armor Runtime Monitor) 框架的 TypeScript 独立版本，与 Python 版本和 Kernel 层检测系统共同构成完整的三层防御架构。</p>
+
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th>防御层</th><th>组件</th><th>检测粒度</th><th>关键能力</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="layer-badge layer-l1">L1 Hook</span></td>
+            <td><strong>AgentMoss</strong> (TypeScript)</td>
+            <td>命令行字符串</td>
+            <td>rm -rf / ✅、PDG 数据流 ✅、bash script.sh ❌</td>
+          </tr>
+          <tr>
+            <td><span class="layer-badge layer-l2">L2 Kernel</span></td>
+            <td>secDetector (openEuler)</td>
+            <td>syscall execve/unlink</td>
+            <td>穿透脚本 ✅、实时阻断 ✅、不理解意图</td>
+          </tr>
+          <tr>
+            <td><span class="layer-badge" style="background: rgba(63,185,80,0.15); color: var(--success);">L2.5 语义</span></td>
+            <td>AgentSight (eBPF)</td>
+            <td>TLS意图+syscall行为</td>
+            <td>因果关联 ✅、语义理解 ✅、不阻断</td>
+          </tr>
+          <tr>
+            <td><span class="layer-badge layer-l3">L3 关联</span></td>
+            <td>AARM 关联引擎</td>
+            <td>parentEventIds</td>
+            <td>Hook+Kernel+语义 → 完整证据链</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="cards-grid" style="margin-top: 32px;">
+      <div class="card">
+        <h3>AgentMoss (TS)</h3>
+        <p>AARM 框架 TypeScript 独立版本，~6800 行代码。Hook 监控方案，不依赖特定 Agent 框架。AgentArmor 论文方法已部分实现。</p>
+      </div>
+      <div class="card">
+        <h3>AgentMoss (Python)</h3>
+        <p>AARM 框架 JiuwenSwarm 旁路扩展版本，3520 行 Python。双模式接入：Extension Hook 回调 + DeepAgent Rail 旁路 patch。</p>
+      </div>
+      <div class="card">
+        <h3>secDetector</h3>
+        <p>openEuler 内构入侵检测系统。内核级 syscall 监控，穿透脚本黑箱，检测 bash script.sh 内含 rm 等间接调用。但不理解 LLM 意图。</p>
+      </div>
+      <div class="card">
+        <h3>AgentSight</h3>
+        <p>UC Santa Cruz eBPF 可观测性框架。弥合语义鸿沟——理解 Agent 意图与行为间的因果关系。仅监控不阻断。&lt;3% CPU 开销。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="#overview">概览</a>
+      <a href="#architecture">架构</a>
+      <a href="#detection">检测方法</a>
+      <a href="#rules">规则集</a>
+      <a href="#usage">使用指南</a>
+      <a href="https://github.com/Agent-Moss" target="_blank">GitHub</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0 · TypeScript/ES2022 · 零外部依赖</p>
+    <p style="margin-top: 8px;">基于 AgentArmor 论文 (arXiv 2508.01249) · MITRE ATLAS 威胁建模</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>
