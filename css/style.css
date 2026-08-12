@@ -269,7 +269,7 @@ code { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.9em; backgro
   border-radius: var(--radius-sm); padding: 20px; overflow-x: auto;
   font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
   font-size: 13px; line-height: 1.6; color: var(--text-primary);
-  margin: 16px 0;
+  margin: 16px 0; white-space: pre; tab-size: 2;
 }
 .code-block .keyword { color: #c678dd; }
 .code-block .string { color: #0a7d3c; }
