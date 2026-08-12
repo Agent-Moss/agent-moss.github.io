@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L2.1 PDG 三层混合机制 — AgentMoss</title>
+  <meta name="description" content="AgentMoss L2.1 PDG 三层混合检测机制，安全标签格传播，16 条违规检测规则。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html">架构</a></li>
+      <li><a href="detection.html" class="active">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="detection.html" class="sidebar-back">← 检测方法</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#overview" class="sidebar-item active">概览</a></li>
+        <li><a href="#mechanism" class="sidebar-item">三层混合机制</a></li>
+        <li><a href="#sub-methods" class="sidebar-item">三种检测子方法</a></li>
+        <li><a href="#node-types" class="sidebar-item">9 种节点类型</a></li>
+        <li><a href="#labels" class="sidebar-item">安全标签系统</a></li>
+        <li><a href="#propagation" class="sidebar-item">格传播规则</a></li>
+      </ul>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-title">其他检测方法</div>
+      <ul class="sidebar-nav">
+        <li><a href="detection-l1.html" class="sidebar-item">L1 单点行为规则</a></li>
+        <li><a href="detection-l2-2.html" class="sidebar-item">L2.2 形式化验证</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <section class="detail-section" id="overview">
+        <div class="detail-section-tag"><span class="layer-badge layer-l2">L2.1</span></div>
+        <h2 class="detail-section-title">PDG 三层混合机制</h2>
+        <p class="detail-section-desc">PDG 检测不是纯模式匹配，而是"正则打标签 → 图论标签传播 → 拓扑违规判定"的三层混合机制。合计 24 条规则。</p>
+
+        <div class="callout">
+          <div class="callout-title">结论先行</div>
+          <p>正则只在第 1 层用于标记节点属性，真正的检测能力来自第 2 层标签传播和第 3 层图拓扑分析。</p>
+        </div>
+      </section>
+
+      <section class="detail-section" id="mechanism">
+        <div class="detail-section-tag">深度解析</div>
+        <h2 class="detail-section-title">三层混合机制</h2>
+        <p class="detail-section-desc">PDG 检测的核心不是正则，而是图论运算。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>层</th><th>方法</th><th>核心代码</th><th>是否为模式匹配</th></tr></thead>
+            <tbody>
+              <tr><td><span class="layer-badge layer-l1">第 1 层</span></td><td>正则打标签 (Labeling)</td><td><code>detectSensitiveKinds</code> / <code>hasPromptInjection</code></td><td>是（仅用于初始化标签）</td></tr>
+              <tr><td><span class="layer-badge layer-l2">第 2 层</span></td><td>图论标签传播 (Propagation)</td><td><code>joinConfidentiality</code> = max / <code>joinIntegrity</code> = min</td><td>否（图论格运算）</td></tr>
+              <tr><td><span class="layer-badge layer-l3">第 3 层</span></td><td>拓扑违规判定 (Inspection)</td><td><code>inspectSecurityPdg</code> — 16 条规则</td><td>否（图结构分析）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p style="color: var(--text-secondary); margin-top: 16px;">第 3 层使用 6 种拓扑分析方法：标签比较、边类型检查、BFS 遍历、数据源计数、兄弟节点对比、参数内容匹配（仅用于精确化降级误报）。正则在 PDG 中不是"检测引擎"，而是"标签器"——检测决策完全由图拓扑分析完成。</p>
+      </section>
+
+      <section class="detail-section" id="sub-methods">
+        <div class="detail-section-tag">子方法</div>
+        <h2 class="detail-section-title">三种检测子方法</h2>
+        <p class="detail-section-desc">L2.1 包含三种互补的检测子方法，合计 24 条规则。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <h3>行为链检测 — 7 条</h3>
+            <p>7 条预定义攻击链模式（download→execute、credential→exfiltration 等）。基于事件序列的 phase 匹配。</p>
+            <p style="margin-top: 8px;"><strong>源文件</strong>: <code>behavior-chain.ts</code></p>
+          </div>
+          <div class="card">
+            <h3>PDG 数据流检测 — 16 条</h3>
+            <p>基于程序依赖图的违规检测。9 始终 block + 4 条件 block/observe + 3 始终 observe。覆盖敏感数据外传、注入检测、工具名欺骗等。</p>
+            <p style="margin-top: 8px;"><strong>源文件</strong>: <code>pdg.ts</code></p>
+          </div>
+          <div class="card">
+            <h3>全局关联 — 1 条</h3>
+            <p>跨会话攻击链检测。通过 parentEventIds 关联不同 run 的事件，检测跨会话的数据外传。</p>
+            <p style="margin-top: 8px;"><strong>源文件</strong>: <code>global-analyzer.ts</code></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-section" id="node-types">
+        <div class="detail-section-tag">节点类型</div>
+        <h2 class="detail-section-title">PDG 9 种细粒度节点类型</h2>
+        <p class="detail-section-desc">基于 AgentArmor 论文 (arXiv 2508.01249)，每条事件按类型分解为多个细粒度子节点，实现子事件级数据流追踪。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>节点类型</th><th>简写</th><th>来源事件</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td><code>system_prompt</code></td><td>SP</td><td>llm_input (system)</td><td>系统级初始输入</td></tr>
+              <tr><td><code>user_prompt</code></td><td>UP</td><td>llm_input (user)</td><td>用户输入的命令或查询</td></tr>
+              <tr><td><code>llm_response</code></td><td>LLM</td><td>llm_output</td><td>模型输出（文本或工具调用决策）</td></tr>
+              <tr><td><code>llm_thought</code></td><td>TH</td><td>llm_output (reasoning)</td><td>Agent 内部思考</td></tr>
+              <tr><td><code>tool_name</code></td><td>TN</td><td>tool_call 分解</td><td>选择的工具名（如 file.read）</td></tr>
+              <tr><td><code>tool_param</code></td><td>TP</td><td>tool_call 分解</td><td>单个工具参数（文件路径、URL、命令等）</td></tr>
+              <tr><td><code>tool_action</code></td><td>T</td><td>tool_call 分解</td><td>工具执行动作本身</td></tr>
+              <tr><td><code>observation</code></td><td>OBS</td><td>tool_result 分解</td><td>工具返回结果</td></tr>
+              <tr><td><code>data</code></td><td>D</td><td>tool_result 分解</td><td>从 OBS 中提取的敏感数据节点</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="detail-section" id="labels">
+        <div class="detail-section-tag">安全标签</div>
+        <h2 class="detail-section-title">安全标签系统</h2>
+        <p class="detail-section-desc">每个 PDG 节点携带一个 SecurityLabel，包含四个维度的安全属性。</p>
+
+        <div class="code-block"><span class="type">type</span> <span class="type">SecurityLabel</span> = {
+  <span class="function">confidentiality</span>: <span class="string">"low" | "medium" | "high"</span>;  <span class="comment">// 机密性</span>
+  <span class="function">integrity</span>:       <span class="string">"low" | "medium" | "high"</span>;  <span class="comment">// 完整性</span>
+  <span class="function">sensitiveKinds</span>:   <span class="type">string</span>[];                   <span class="comment">// 敏感类型标签</span>
+  <span class="function">actionClass</span>:      <span class="type">SecurityActionClass</span>;         <span class="comment">// 操作分类</span>
+};</div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>维度</th><th>取值</th><th>语义</th></tr></thead>
+            <tbody>
+              <tr><td>Confidentiality</td><td>high / medium / low</td><td>检测到 API Token、密码、私钥、.env、PII → high；工具输出 → medium；其他 → low</td></tr>
+              <tr><td>Integrity</td><td>high / medium / low</td><td>system/user → high；llm → medium；tool/external → low（含注入则强制 low）</td></tr>
+              <tr><td>sensitiveKinds</td><td>数组</td><td>api_token, credential, private_key, dotenv_secret, pii_financial, prompt_injection</td></tr>
+              <tr><td>actionClass</td><td>枚举</td><td>read, write, network_egress, message_egress, compute, unknown</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="detail-section" id="propagation">
+        <div class="detail-section-tag">格传播</div>
+        <h2 class="detail-section-title">格传播规则 (Lattice Propagation)</h2>
+        <p class="detail-section-desc">基于安全格理论，沿数据依赖边传播标签。机密性取高（高处流原则），完整性取低（低处流原则）。</p>
+
+        <div class="callout">
+          <div class="callout-title">机密性取 max（高处流原则）</div>
+          <p>一个节点只要从任何一条路径接收到高机密数据，该节点就应被视为高机密。</p>
+        </div>
+        <div class="callout">
+          <div class="callout-title">完整性取 min（低处流原则）</div>
+          <p>一个节点只要从任何一条路径接收到低完整性数据，该节点就应被视为低完整性——不可信数据"污染"了下游。</p>
+        </div>
+
+        <div class="code-block"><span class="comment">// 机密性合并：取最高级别</span>
+<span class="function">joinConfidentiality</span>(left, right) = confidentialityRank[left] >= right ? left : right;
+
+<span class="comment">// 完整性合并：取最低级别</span>
+<span class="function">joinIntegrity</span>(left, right) = integrityRank[left] <= right ? left : right;
+
+<span class="comment">// 敏感类型合并：取并集</span>
+sensitiveKinds = unique([...left, ...right]);</div>
+
+        <p style="color: var(--text-secondary); margin-top: 16px;">传播路径：Parent OBS → Child UP/SP（注入检测关键路径）、Parent OBS/D → Child TP（数据外传检测关键路径）、Parent LLM → Child T（控制流依赖）等。</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="detection-l1.html">L1 检测</a>
+      <a href="detection-l2-1.html">L2.1 检测</a>
+      <a href="detection-l2-2.html">L2.2 检测</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

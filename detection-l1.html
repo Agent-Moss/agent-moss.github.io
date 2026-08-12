@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L1 单点行为规则 — AgentMoss</title>
+  <meta name="description" content="AgentMoss L1 单点行为规则，91 条正则规则覆盖 12 个 ATLAS Tactic。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html">架构</a></li>
+      <li><a href="detection.html" class="active">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="detection.html" class="sidebar-back">← 检测方法</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#overview" class="sidebar-item active">概览</a></li>
+        <li><a href="#method" class="sidebar-item">检测方法</a></li>
+        <li><a href="#strengths" class="sidebar-item">优势</a></li>
+        <li><a href="#limitations" class="sidebar-item">局限性</a></li>
+      </ul>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-title">其他检测方法</div>
+      <ul class="sidebar-nav">
+        <li><a href="detection-l2-1.html" class="sidebar-item">L2.1 PDG 混合机制</a></li>
+        <li><a href="detection-l2-2.html" class="sidebar-item">L2.2 形式化验证</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <section class="detail-section" id="overview">
+        <div class="detail-section-tag"><span class="layer-badge layer-l1">L1</span></div>
+        <h2 class="detail-section-title">L1 单点行为规则</h2>
+        <p class="detail-section-desc">91 条正则规则覆盖 12 个 ATLAS Tactic，零时延同步返回 block/approval 决策。阻拦 (block) 24 条，询问 (approval) 67 条。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <h3>规则分布</h3>
+            <ul>
+              <li><strong>block</strong> — 24 条：极高置信度威胁（rm -rf /、fork-bomb、reverse-shell 等）</li>
+              <li><strong>approval</strong> — 67 条：高风险但可能合法的操作（dd、mkfs、iptables 等）</li>
+            </ul>
+            <p style="margin-top: 8px;"><strong>源文件</strong>: <code>rules.ts</code> · <code>hooks.ts</code></p>
+          </div>
+          <div class="card">
+            <h3>ATLAS 覆盖</h3>
+            <p>覆盖 12 个 MITRE ATLAS Tactic，包括 Defense Evasion、Privilege Escalation、Lateral Movement、Collection、Exfiltration、Persistence、Credential Access 等。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-section" id="method">
+        <div class="detail-section-tag">技术原理</div>
+        <h2 class="detail-section-title">检测方法</h2>
+        <p class="detail-section-desc">基于正则表达式的单步命令行字符串匹配。fast-path 初筛，无上下文依赖，无 Token 消耗。</p>
+
+        <div class="callout">
+          <div class="callout-title">工作方式</div>
+          <p>每次 Tool Call 请求到达时，L1 层同步对 <code>toolName</code> + <code>params</code> 执行正则匹配。匹配命中后立即返回 block 或 approval 决策，无需等待异步分析。</p>
+        </div>
+      </section>
+
+      <section class="detail-section" id="strengths">
+        <div class="detail-section-tag">优势</div>
+        <h2 class="detail-section-title">核心优势</h2>
+        <div class="cards-grid">
+          <div class="card">
+            <h3>性能</h3>
+            <ul>
+              <li>✅ 零延迟（&lt;1ms）</li>
+              <li>✅ 零外部依赖</li>
+              <li>✅ 无 Token 消耗</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>覆盖率</h3>
+            <ul>
+              <li>✅ 覆盖已知威胁模式</li>
+              <li>✅ 12 个 ATLAS Tactic</li>
+              <li>✅ 误报风险已治理（44 条降级为 approval）</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="detail-section" id="limitations">
+        <div class="detail-section-tag">局限性</div>
+        <h2 class="detail-section-title">已知局限</h2>
+        <div class="cards-grid">
+          <div class="card">
+            <h3>上下文盲区</h3>
+            <ul>
+              <li>❌ 无上下文感知</li>
+              <li>❌ 无变量展开追踪</li>
+              <li>❌ 无脚本内容检测</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>对抗性</h3>
+            <ul>
+              <li>❌ 对抗性绕过（编码变体、前缀包裹等）</li>
+              <li>❌ 无法检测跨步骤组合攻击</li>
+              <li>❌ 无法理解行为意图</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">如何弥补局限</div>
+          <p>L1 的局限性由 <a href="detection-l2-1.html">L2.1 PDG 混合机制</a>（数据流追踪 + 行为链检测）和 <a href="detection-l2-2.html">L2.2 形式化验证</a>（时序模型检测）弥补。三层检测形成纵深防御。</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="detection-l1.html">L1 检测</a>
+      <a href="detection-l2-1.html">L2.1 检测</a>
+      <a href="detection-l2-2.html">L2.2 检测</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

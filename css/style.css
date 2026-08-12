@@ -335,6 +335,64 @@ table .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
+/* ===================== Paper Citation Button ===================== */
+.paper-citation {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 20px 24px; margin: 24px 0;
+  background: linear-gradient(135deg, rgba(45,90,63,0.06) 0%, rgba(45,122,79,0.04) 100%);
+  border: 1px solid var(--border-default); border-left: 4px solid var(--moss-accent);
+  border-radius: var(--radius-md);
+}
+.paper-citation-icon { font-size: 28px; flex-shrink: 0; margin-top: 2px; }
+.paper-citation-body { flex: 1; min-width: 0; }
+.paper-citation-body h4 {
+  font-size: 16px; font-weight: 700; color: var(--moss-dark);
+  margin-bottom: 6px; line-height: 1.4;
+}
+.paper-citation-body .paper-authors {
+  font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;
+}
+.paper-citation-body .paper-venue {
+  font-size: 12px; color: var(--text-muted); margin-bottom: 12px;
+}
+.paper-citation-body .paper-abstract {
+  font-size: 14px; color: var(--text-secondary); line-height: 1.6;
+  margin-bottom: 12px;
+}
+.btn-paper {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 20px; background: var(--moss-primary); border: 1px solid var(--moss-dark);
+  border-radius: var(--radius-sm); color: #fff !important; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s; text-decoration: none;
+}
+.btn-paper:hover { background: var(--moss-light); color: #fff; transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+/* ===================== Sub-page Navigation Cards ===================== */
+.method-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 32px 0;
+}
+.method-nav-card {
+  display: block; text-decoration: none;
+  background: var(--bg-card); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); padding: 28px 24px;
+  transition: all 0.3s; position: relative; box-shadow: var(--shadow-sm);
+}
+.method-nav-card:hover {
+  border-color: var(--moss-light); box-shadow: var(--shadow-md); transform: translateY(-3px);
+}
+.method-nav-card .method-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 4px;
+  font-size: 12px; font-weight: 700; margin-bottom: 12px;
+}
+.method-nav-card h3 { font-size: 20px; font-weight: 700; color: var(--moss-dark); margin-bottom: 8px; }
+.method-nav-card p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+.method-nav-card .method-stats {
+  display: flex; gap: 16px; font-size: 13px; color: var(--moss-accent); font-weight: 600;
+}
+
 /* ===================== Footer ===================== */
 .footer {
   padding: 48px 24px; background: var(--bg-card); border-top: 1px solid var(--border-default);
