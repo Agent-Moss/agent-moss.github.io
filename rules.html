@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>规则集 — AgentMoss</title>
-  <meta name="description" content="AgentMoss 115 条安全规则，三层检测体系，覆盖 12 个 ATLAS Tactic。">
+  <meta name="description" content="AgentMoss 130 条安全规则，三层检测体系，覆盖 12 个 ATLAS Tactic。">
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
 </head>
@@ -38,7 +38,7 @@
         <li><a href="#overview" class="sidebar-item active">规则概览</a></li>
         <li><a href="#l1-rules" class="sidebar-item">L1 单点行为规则</a></li>
         <li><a href="#l2-1-pdg" class="sidebar-item">L2.1 基于 PDG</a></li>
-        <li><a href="#l2-2-model" class="sidebar-item">L2.2 模型检测（待添加）</a></li>
+        <li><a href="#l2-2-model" class="sidebar-item">L2.2 模型检测（已实现）</a></li>
         <li><a href="#distribution" class="sidebar-item">动作分布</a></li>
         <li><a href="#registry" class="sidebar-item">属性注册表</a></li>
       </ul>
@@ -50,13 +50,13 @@
       <!-- Overview -->
       <section class="detail-section" id="overview">
         <div class="detail-section-tag">规则集</div>
-        <h2 class="detail-section-title">115 条安全规则 · 3 层覆盖</h2>
+        <h2 class="detail-section-title">130 条安全规则 · 3 层覆盖</h2>
         <p class="detail-section-desc">基于 MITRE ATLAS + ATT&CK 威胁建模，覆盖 12 个攻击战术类别。三层检测体系逐层提升绕过难度。</p>
 
         <div class="stats-bar" style="border: none; padding: 0 0 24px; margin-bottom: 16px; justify-content: flex-start; gap: 32px;">
           <div class="stat-item"><div class="stat-value" style="color: var(--warning);">91</div><div class="stat-label">L1 单点行为规则</div></div>
           <div class="stat-item"><div class="stat-value" style="color: var(--info);">24</div><div class="stat-label">L2.1 PDG 已实现</div></div>
-          <div class="stat-item"><div class="stat-value" style="color: var(--text-secondary);">—</div><div class="stat-label">L2.2 模型检测（待添加）</div></div>
+          <div class="stat-item"><div class="stat-value" style="color: #6366f1;">15</div><div class="stat-label">L2.2 模型检测（已实现）</div></div>
           <div class="stat-item"><div class="stat-value" style="color: var(--text-secondary);">—</div><div class="stat-label">L3 语义（待添加）</div></div>
         </div>
 
@@ -66,7 +66,7 @@
             <tbody>
               <tr><td><span class="layer-badge layer-l1">L1</span></td><td>单点行为规则</td><td>模式匹配 (Pattern Match)</td><td>91</td><td><span class="badge badge-block">已实现</span></td></tr>
               <tr><td><span class="layer-badge layer-l2">L2</span></td><td>长行为链规则</td><td>L2.1 基于PDG（行为链+PDG+全局关联）</td><td>24</td><td><span class="badge badge-block">已实现</span></td></tr>
-              <tr><td><span class="layer-badge layer-l2">L2</span></td><td>长行为链规则</td><td>L2.2 模型检测，时序规则</td><td>—</td><td><span class="badge badge-observe">待添加</span></td></tr>
+              <tr><td><span class="layer-badge layer-l2">L2</span></td><td>长行为链规则</td><td>L2.2 模型检测，时序规则</td><td>15</td><td><span class="badge badge-block">已实现</span></td></tr>
               <tr><td><span class="layer-badge" style="background: rgba(26,138,76,0.12); color: var(--success);">L3</span></td><td>基于语义的规则</td><td>LLM 辅助意图解析</td><td>—</td><td><span class="badge badge-observe">待添加</span></td></tr>
             </tbody>
           </table>
@@ -170,34 +170,48 @@
 
       <!-- L2.2 Model Detection -->
       <section class="detail-section" id="l2-2-model">
-        <div class="detail-section-tag">L2.2 模型检测（待添加）</div>
-        <h2 class="detail-section-title">L2.2 模型检测，时序规则</h2>
-        <p class="detail-section-desc">基于时序逻辑（LTL/CTL）的模型检测方法，自动验证 Agent 行为序列是否满足安全属性。当前规划中，尚未实现。</p>
+        <div class="detail-section-tag">L2.2 模型检测（已实现）</div>
+        <h2 class="detail-section-title">L2.2 模型检测，时序规则（15 条）</h2>
+        <p class="detail-section-desc">基于 LTL/CTL 时序逻辑的模型检测，将 Agent 行为轨迹建模为 Kripke 结构，自动验证时序安全属性。</p>
 
-        <div class="cards-grid">
-          <div class="card">
-            <h3>设计目标</h3>
-            <ul>
-              <li>自动发现未知攻击链模式（无需预定义）</li>
-              <li>验证复杂时序约束属性</li>
-              <li>覆盖 L2.1 预定义模式无法穷举的攻击变体</li>
-              <li>与 L2.1 PDG 互补：已知模式 → PDG，未知模式 → 模型检测</li>
-            </ul>
-          </div>
-          <div class="card">
-            <h3>预期方法</h3>
-            <ul>
-              <li>将 Agent 行为轨迹建模为状态迁移系统（Kripke 结构）</li>
-              <li>用 LTL/CTL 公式表达安全属性</li>
-              <li>模型检测器自动验证属性满足性</li>
-              <li>反例路径作为攻击证据链</li>
-            </ul>
-          </div>
+        <h3 style="margin: 24px 0 12px; font-size: 1.1rem; color: var(--text-primary);">LTL 攻击模式检测（10 条）</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">LTL 公式描述攻击模式，公式满足 = 攻击存在。支持 G/F/X/U 时序算子。</p>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>#</th><th>规则 ID</th><th>LTL 公式</th><th>描述</th><th>动作</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td><code>mc-ltl-001</code></td><td><code>F(reads_credential & F(network_egress))</code></td><td>凭证读取后网络外传</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>2</td><td><code>mc-ltl-002</code></td><td><code>F(download_file & F(execute_file))</code></td><td>下载后执行</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>3</td><td><code>mc-ltl-003</code></td><td><code>F(disable_security & F(execute|delete|privesc))</code></td><td>禁用安全后破坏性操作</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>4</td><td><code>mc-ltl-004</code></td><td><code>F(prompt_injection & F(egress|write|exec))</code></td><td>注入后敏感操作</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>5</td><td><code>mc-ltl-005</code></td><td><code>F(reads_credential & F(lateral_movement))</code></td><td>凭证读取后横向移动</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>6</td><td><code>mc-ltl-006</code></td><td><code>F(sensitive_data & F(clear_logs))</code></td><td>敏感数据后清除日志</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>7</td><td><code>mc-ltl-007</code></td><td><code>F(privilege_escalation & F(install_persistence))</code></td><td>提权后安装持久化</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>8</td><td><code>mc-ltl-008</code></td><td><code>F(download_file & F(install_persistence))</code></td><td>下载后安装持久化</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>9</td><td><code>mc-ltl-009</code></td><td><code>F(sensitive_data & F(archive & F(egress)))</code></td><td>敏感数据→归档→外传</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>10</td><td><code>mc-ltl-010</code></td><td><code>F(install_persistence)</code></td><td>持久化机制安装</td><td><span class="badge badge-approval">approval</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin: 24px 0 12px; font-size: 1.1rem; color: var(--text-primary);">CTL 安全属性验证（5 条）</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 12px;">CTL 公式描述安全属性，属性违反 = 攻击存在。支持 AG/EG/AF/EF 路径量词。</p>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>#</th><th>规则 ID</th><th>CTL 公式</th><th>描述</th><th>动作</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td><code>mc-ctl-001</code></td><td><code>AG(!clear_logs)</code></td><td>安全不变量：日志不应被清除</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>2</td><td><code>mc-ctl-002</code></td><td><code>AG(injection -> AF(blocked))</code></td><td>活性：注入必须被阻断</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>3</td><td><code>mc-ctl-003</code></td><td><code>AG(persistence -> AF(blocked|approved))</code></td><td>问责：持久化必须被管控</td><td><span class="badge badge-approval">approval</span></td></tr>
+              <tr><td>4</td><td><code>mc-ctl-004</code></td><td><code>AG(disable_sec -> AF(blocked))</code></td><td>活性：安全禁用必须被阻断</td><td><span class="badge badge-block">block</span></td></tr>
+              <tr><td>5</td><td><code>mc-ctl-005</code></td><td><code>AG(privesc -> AF(blocked|approved))</code></td><td>问责：提权必须被管控</td><td><span class="badge badge-approval">approval</span></td></tr>
+            </tbody>
+          </table>
         </div>
 
         <div class="callout">
-          <div class="callout-title">与 L2.1 的关系</div>
-          <p>L2.1 基于预定义模式和图分析，精确检测已知攻击链。L2.2 基于模型检测，自动发现满足/违反时序属性的未知攻击模式。两者互补覆盖已知和未知的长行为链威胁。</p>
+          <div class="callout-title">实现文件</div>
+          <p><code>mc-types.ts</code> (类型定义) · <code>state-machine.ts</code> (Kripke 构建+标记函数) · <code>temporal-logic.ts</code> (LTL/CTL 解析器) · <code>model-checker.ts</code> (LTL 迹检查+CTL 自底向上标记) · <code>mc-rules.ts</code> (15 条预定义规则)</p>
         </div>
       </section>
 
@@ -209,12 +223,12 @@
 
         <div class="table-wrapper">
           <table>
-            <thead><tr><th>动作</th><th>L1 单点</th><th>L2.1 PDG</th><th>合计</th></tr></thead>
+            <thead><tr><th>动作</th><th>L1 单点</th><th>L2.1 PDG</th><th>L2.2 模型检测</th><th>合计</th></tr></thead>
             <tbody>
-              <tr><td><span class="badge badge-block">block</span></td><td>24</td><td>9</td><td><strong>33</strong></td></tr>
-              <tr><td><span class="badge badge-approval">approval</span></td><td>67</td><td>0</td><td><strong>67</strong></td></tr>
-              <tr><td><span class="badge badge-observe">observe</span></td><td>—</td><td>3 + 7 + 1</td><td><strong>11</strong></td></tr>
-              <tr><td><strong>合计</strong></td><td>91</td><td>24</td><td><strong>115</strong></td></tr>
+              <tr><td><span class="badge badge-block">block</span></td><td>24</td><td>9</td><td>9</td><td><strong>42</strong></td></tr>
+              <tr><td><span class="badge badge-approval">approval</span></td><td>67</td><td>0</td><td>3</td><td><strong>70</strong></td></tr>
+              <tr><td><span class="badge badge-observe">observe</span></td><td>—</td><td>3 + 7 + 1</td><td>3</td><td><strong>14</strong></td></tr>
+              <tr><td><strong>合计</strong></td><td>91</td><td>24</td><td>15</td><td><strong>130</strong></td></tr>
             </tbody>
           </table>
         </div>
