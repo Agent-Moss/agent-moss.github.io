@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentGate — AgentMoss</title>
+  <meta name="description" content="AgentGate：系统层 Agent 行为采集与安全分析网关，与 AgentMoss 应用层监控配合，构成完整纵深防御。">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <a href="index.html" class="navbar-logo"><span class="moss-icon">🌿</span> AgentMoss</a>
+    <button class="navbar-mobile-toggle">☰</button>
+    <ul class="navbar-menu">
+      <li><a href="architecture.html">架构</a></li>
+      <li><a href="detection.html">检测方法</a></li>
+      <li><a href="rules.html">规则集</a></li>
+      <li><a href="usage.html">使用指南</a></li>
+      <li><a href="aarm.html">AARM</a></li>
+      <li><a href="agentgate.html" class="active">AgentGate</a></li>
+      <li><a href="https://github.com/Agent-Moss" target="_blank">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- Detail Page -->
+<div class="detail-page">
+  <div class="detail-layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <a href="index.html" class="sidebar-back">← 返回首页</a>
+      <div class="sidebar-title">本页索引</div>
+      <ul class="sidebar-nav">
+        <li><a href="#overview" class="sidebar-item active">项目定位</a></li>
+        <li><a href="#architecture" class="sidebar-item">三层采集架构</a></li>
+        <li><a href="#workflow" class="sidebar-item">核心流程</a></li>
+        <li><a href="#decision" class="sidebar-item">三级决策链</a></li>
+        <li><a href="#schema" class="sidebar-item">统一事件 Schema</a></li>
+        <li><a href="#privacy" class="sidebar-item">隐私保护</a></li>
+        <li><a href="#compare" class="sidebar-item">与 AgentSight 对比</a></li>
+        <li><a href="#evolution" class="sidebar-item">演进路线</a></li>
+      </ul>
+    </aside>
+
+    <!-- Content -->
+    <main class="detail-content">
+
+      <!-- Overview -->
+      <section class="detail-section" id="overview">
+        <div class="detail-section-tag">项目定位</div>
+        <h2 class="detail-section-title">AgentGate — 系统层 Agent 行为采集与安全分析网关</h2>
+        <p class="detail-section-desc">AgentGate 位于 Agent 与 AgentMoss 之间，从系统层面收集 Agent 运行数据：它拦截 Agent 与 LLM API 的通信、Agent 的实际命令执行，以及内核层的真实系统调用，归一化后交给 AgentMoss 做应用层安全分析，并可同步返回 Allow/Deny 决策实现实时阻断。</p>
+
+        <div class="card">
+          <h3>AgentGate 与 AgentMoss 的分工</h3>
+          <p><strong>AgentGate（系统层监控）</strong>：采集 Agent「说了什么」（LLM API 意图）、「做了什么」（实际命令）、「真的发生了什么」（内核 syscall），是行为数据的采集与第一道过滤网关。</p>
+          <p style="margin-top: 10px;"><strong>AgentMoss（应用层监控）</strong>：基于 Hook 点的全链路观测，130 条安全规则、PDG 数据流、模型检测，对 AgentGate 上报的行为做深度安全分析并给出 Allow/Deny 决策。</p>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">一句话总结</div>
+          <p>AgentGate = 行为采集 + 语义提取 + 规则过滤 + 实时阻断网关；AgentMoss = 深度安全分析引擎。两者配合形成「系统层采集 → 应用层分析 → 同步阻断」的完整闭环。</p>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-icon">🌐</span>
+            <h3>跨平台零侵入</h3>
+            <p>v3 以 LLM API 代理为主路径（mitmproxy），仅需设置 HTTP_PROXY，无需改 Agent 代码、无需 root。适配 Linux / macOS / Windows / WSL2。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🎯</span>
+            <h3>高层语义直接获取</h3>
+            <p>直接解析 tool_calls 的 tool_name + arguments，得到 Agent 的真实意图，而非仅看到系统调用轨迹。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">⛔</span>
+            <h3>三级决策 + Fail-Closed</h3>
+            <p>白名单 → 本地快速阻断（403 / kill / 内核阻断）→ AgentMoss 深度分析。AgentMoss 不可用时默认 Deny。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🔒</span>
+            <h3>隐私三模式过滤</h3>
+            <p>auto / cloud_only / local_only 三种模式，正则脱敏 API key、密码、私钥，本地哈希保护敏感凭证。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Architecture -->
+      <section class="detail-section" id="architecture">
+        <div class="detail-section-tag">系统架构</div>
+        <h2 class="detail-section-title">L1 / L2 / L3 三层递进采集模型</h2>
+        <p class="detail-section-desc">AgentGate 从三个层次采集 Agent 行为，语义层次从「意图」到「实际执行」再到「内核真实发生」逐层递进，形成完整证据链。</p>
+
+        <div class="arch-diagram">
+┌──────────────────────────────────────────────────────────────────┐
+│                      AgentGate v3.0 核心引擎                        │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌────────────────────────────┐   ┌───────────────────────────┐  │
+│  │ L1  LLM API 代理 (主路径)   │   │ L2  PTY 终端拦截           │  │
+│  │  mitmproxy /v1/chat/...    │   │  AgentLauncher 统一启动器   │  │
+│  │  tool_calls + arguments    │   │  实际执行的命令字符串       │  │
+│  │  语义意图 100% 覆盖         │   │  AGENTGATE_SESSION_ID 贯通  │  │
+│  └─────────────┬──────────────┘   └─────────────┬─────────────┘  │
+│                │        PendingAction 匹配       │                │
+│                │   (session + tool + 时间邻近度)  │                │
+│                └───────────────┬────────────────┘                │
+│                                ▼                                 │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │        PhaseCoordinator：会话聚合 + 归一化 + 决策             │  │
+│  │  白名单 → 快速阻断 → 触发规则 → AgentMoss 深度分析 → Allow    │  │
+│  └────────────────────────────────────────────────────────────┘  │
+│                                ▲                                 │
+│  ┌────────────────────────────┴─────────────────────────────┐   │
+│  │ L3  eBPF 系统监控 (可选, 仅 Linux)                        │   │
+│  │  BCC 加载器 · 29 种 syscall · PID 白名单 + 子进程跟踪      │   │
+│  │  bpf_override_return() 内核级阻断 (需 4.16+, 否则降级)     │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+        </div>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>采集层</th><th>数据源</th><th>采集方式</th><th>语义层次</th><th>平台</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="layer-badge layer-l1">L1</span></td>
+                <td>LLM API 通信</td>
+                <td>mitmproxy 透明代理，解析 OpenAI / Anthropic 协议（含 SSE 流式 tool_calls）</td>
+                <td>意图层：tool_name + arguments，Agent 主动调用 100% 覆盖</td>
+                <td>全平台</td>
+              </tr>
+              <tr>
+                <td><span class="layer-badge layer-l2">L2</span></td>
+                <td>PTY 进程执行</td>
+                <td>AgentLauncher 启动子进程，PTY 拦截实际输出命令</td>
+                <td>执行层：实际运行的命令字符串（如 bash script.sh 内部命令）</td>
+                <td>全平台</td>
+              </tr>
+              <tr>
+                <td><span class="layer-badge layer-l3">L3</span></td>
+                <td>内核 syscall</td>
+                <td>BCC eBPF 加载器，29 种事件类型，PID 白名单 + clone 自动跟踪</td>
+                <td>事实层：内核真实发生的系统调用（不可篡改）</td>
+                <td>仅 Linux</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">为什么以 L1 为主路径？</div>
+          <p>v2 曾用 eBPF 作为唯一采集源，但存在 WSL2 PID namespace 不匹配、仅 Linux、需 root、语义层低（只知 openat(pathname)，不知意图）四大问题。v3 转向「以 LLM API 语义拦截为主路径，eBPF 为可选增强」，实现跨平台零侵入，同时保留 eBPF 兜底真实执行。</p>
+        </div>
+      </section>
+
+      <!-- Workflow -->
+      <section class="detail-section" id="workflow">
+        <div class="detail-section-tag">核心流程</div>
+        <h2 class="detail-section-title">PhaseCoordinator 两阶段决策流程</h2>
+        <p class="detail-section-desc">AgentGate 的核心中枢是线程安全的 PhaseCoordinator（async + sync 双接口），将一次 Agent 行为拆分为「采集」与「判断」两个阶段。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-icon">📡</span>
+            <h3>Phase 1 · 数据采集</h3>
+            <p>L1 代理解析 tool_calls 后立即上报（不等 L2），保证决策低延迟；L2 事件随后到达，通过 PendingAction 与 L1 融合补充执行细节；L3 事件 fire-and-forget 独立走全量分析管线。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚖️</span>
+            <h3>Phase 2 · 安全判断</h3>
+            <p>Session 聚合 → 白名单跳过 → 快速阻断规则 → 触发规则（提供精确 severity/risk_type）→ 隐私过滤 → 默认全量送 AgentMoss 三层分析 → 返回 Allow/Deny。</p>
+          </div>
+        </div>
+
+        <h3>L1 ↔ L2 匹配机制</h3>
+        <p>通过 <code>PendingAction</code> 数据结构按 session_id + tool_name + 时间邻近度匹配 L1 意图与 L2 实际执行，支持 exact/fuzzy 两种匹配，超时自动降级为仅 L1 分析，保证 AgentMoss 上报完整。</p>
+
+        <h3>同步阻断能力</h3>
+        <ul>
+          <li><strong>L1 代理层</strong>：Deny 时替换响应为 403，Agent 直接收到拒绝</li>
+          <li><strong>L2 进程层</strong>：Deny 时 kill 整个进程树</li>
+          <li><strong>L3 内核层</strong>：<code>bpf_override_return()</code> 内核级 syscall 阻断（需 CONFIG_BPF_KPROBE_OVERRIDE，不支持时降级 userspace kill_tree）</li>
+        </ul>
+
+        <div class="code-block"># 典型部署
+pip install agent-gate-sec[proxy]
+
+# 启动网关（推荐方式：普通用户即可）
+agent-gate proxy --port 9110
+
+# Agent 流量自动经过 AgentGate
+export HTTPS_PROXY=http://127.0.0.1:9110
+export HTTP_PROXY=http://127.0.0.1:9110
+claude-code</div>
+      </section>
+
+      <!-- Decision Chain -->
+      <section class="detail-section" id="decision">
+        <div class="detail-section-tag">决策链</div>
+        <h2 class="detail-section-title">白名单 → 快速阻断 → AgentMoss 三级决策</h2>
+        <p class="detail-section-desc">每条触发规则都有明确的动作语义，AgentGate 按优先级逐级决策，高置信度风险在本地秒级拦截，其余交给 AgentMoss 深度分析。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>决策级别</th><th>规则类型</th><th>动作</th><th>示例</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>① 白名单</td>
+                <td><code>action: allow</code> + <code>_skip_agentmoss: true</code></td>
+                <td><span class="badge badge-observe">直接放行</span> 不消耗 AgentMoss</td>
+                <td>安全只读操作、内联脚本假阳性防护</td>
+              </tr>
+              <tr>
+                <td>② 快速阻断</td>
+                <td><code>action: block</code> + <code>local_block: true</code></td>
+                <td><span class="badge badge-block">本地秒级阻断</span> 403 / kill / 内核阻断</td>
+                <td>rm -rf 根目录、chmod 777、curl|bash、反弹 shell</td>
+              </tr>
+              <tr>
+                <td>③ 触发分析</td>
+                <td><code>trigger_analysis</code></td>
+                <td><span class="badge badge-approval">送 AgentMoss</span> 提供精确 severity/risk_type</td>
+                <td>敏感文件读写、提权、横向移动、持久化、数据外传</td>
+              </tr>
+              <tr>
+                <td>④ 默认全量</td>
+                <td>未匹配任何规则</td>
+                <td>送 AgentMoss 三层分析（PDG 数据流 + 行为链 + 模型检测）</td>
+                <td>任意 tool_call 均上报，构建完整行为上下文</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">Fail-Closed 语义</div>
+          <p>AgentMoss 不可用时默认 <strong>Deny</strong>（区分 timeout / service_unavailable 两类），网关对非预期异常 fail open，避免因监控组件故障放大 Agent 权限。</p>
+        </div>
+
+        <h3>规则集覆盖（trigger_rules.yaml, 586 行）</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>类别</th><th>数量</th><th>典型规则</th></tr></thead>
+            <tbody>
+              <tr><td>白名单</td><td>5 条</td><td>安全只读、内联脚本防护</td></tr>
+              <tr><td>快速阻断</td><td>14+ 条</td><td>rm -rf 根目录 / chmod 777 / curl|bash / 反弹 shell / fork-bomb</td></tr>
+              <tr><td>触发分析</td><td>20+ 条</td><td>敏感文件 / 提权 / 横向移动 / 持久化 / 数据外传</td></tr>
+              <tr><td>L3 eBPF 规则</td><td>独立集合</td><td>syscall 级模式（每条规则通常含 proxy / pty 双版本）</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Schema -->
+      <section class="detail-section" id="schema">
+        <div class="detail-section-tag">数据格式</div>
+        <h2 class="detail-section-title">NormalizedEvent 统一事件 Schema</h2>
+        <p class="detail-section-desc">三层采集的事件经归一化后统一为 action / target / payload / process / os_context 结构，AgentMoss 无需感知事件来源层即可直接分析。</p>
+
+        <div class="code-block">{
+  "event_id": "uuid",
+  "timestamp": { "timestamp_ns": 1700000000000000000, "iso": "2026-05-29T10:00:00Z" },
+  "source_os": "linux",
+  "source_collector": "llm_api_proxy",   // llm_api_proxy | pty | ebpf
+  "session_id": "thread_abc123",
+  "agent_type": "claude-code",
+  "action": {
+    "action_type": "tool_call",
+    "tool_name": "bash",
+    "tool_call_id": "call_xyz",
+    "arguments_raw": "{\"command\":\"rm -rf /tmp/cache\"}"
+  },
+  "target": {
+    "command": "rm -rf /tmp/cache",
+    "cwd": "",
+    "file_path": "",
+    "arguments": { "command": "rm -rf /tmp/cache" }
+  },
+  "payload": {
+    "request_model": "claude-sonnet-4-20250514",
+    "request_messages_count": 5,
+    "response_content": "I'll run that command.",
+    "tool_response_content": "command executed",
+    "tool_response_exit_code": 0
+  },
+  "process": { "pid": 0, "comm": "", "agent_type": "claude-code" },
+  "os_context": {}
+}</div>
+
+        <h3>AgentMoss 上报格式</h3>
+        <p>AgentGate 将归一化事件打包为 AgentMoss 分析请求：<code>session_id + prompt_session + prompt_history + action_history + a_next + reason + source_layers</code>，其中 <code>source_layers</code> 标注本次判断涉及 L1/L2/L3 中的哪些层，便于 AgentMoss 分层分析。</p>
+      </section>
+
+      <!-- Privacy -->
+      <section class="detail-section" id="privacy">
+        <div class="detail-section-tag">隐私保护</div>
+        <h2 class="detail-section-title">三模式隐私过滤</h2>
+        <p class="detail-section-desc">PrivacyFilter 在数据离开本机前进行脱敏，保护 Agent 交互中的敏感凭证与个人信息。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>模式</th><th>行为</th><th>适用场景</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>auto</strong></td>
+                <td>正则脱敏 API key、密码、私钥后上报</td>
+                <td>默认模式，兼顾安全分析与隐私</td>
+              </tr>
+              <tr>
+                <td><strong>cloud_only</strong></td>
+                <td>脱敏 + 截断大响应体，仅保留必要元数据</td>
+                <td>云端部署 AgentMoss</td>
+              </tr>
+              <tr>
+                <td><strong>local_only</strong></td>
+                <td>敏感字段本地哈希后上报，明文永不出本机</td>
+                <td>高隐私要求场景</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Compare with AgentSight -->
+      <section class="detail-section" id="compare">
+        <div class="detail-section-tag">生态对比</div>
+        <h2 class="detail-section-title">AgentGate vs AgentSight</h2>
+        <p class="detail-section-desc">AgentSight（UC Santa Cruz，eBPF 可观测性框架，参考 eunomia.dev/zh/agentsight）与 AgentGate 同属「系统层 Agent 监控」路线，但定位互补：AgentSight 专注可观测与因果分析，AgentGate 专注行为采集 + 安全阻断。</p>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>维度</th><th>AgentGate</th><th>AgentSight</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>定位</td>
+                <td>行为采集 + 安全分析网关（可阻断）</td>
+                <td>可观测性框架（仅监控不阻断）</td>
+              </tr>
+              <tr>
+                <td>采集核心</td>
+                <td>L1 LLM API 语义（主）+ L2 PTY + L3 eBPF（可选）</td>
+                <td>eBPF uprobes 拦截 TLS 明文 + tracepoints 捕获 syscall</td>
+              </tr>
+              <tr>
+                <td>语义获取</td>
+                <td>直接解析 tool_calls 意图，100% 覆盖 Agent 主动调用</td>
+                <td>边界追踪 + 因果引擎（进程谱系 + 时间邻近性 + 参数匹配）</td>
+              </tr>
+              <tr>
+                <td>零侵入</td>
+                <td>设置 HTTP_PROXY 即可，无需 root（L3 除外）</td>
+                <td>无需改代码；eBPF 捕获需 root / sudo</td>
+              </tr>
+              <tr>
+                <td>平台</td>
+                <td>全平台（L3 仅 Linux）</td>
+                <td>top/bind/report 全平台；record + eBPF 仅 Linux 4.1+</td>
+              </tr>
+              <tr>
+                <td>阻断能力</td>
+                <td>403 / kill 进程树 / bpf_override_return 内核阻断</td>
+                <td>无（仅观测）</td>
+              </tr>
+              <tr>
+                <td>分析联动</td>
+                <td>对接 AgentMoss 深度分析（PDG / 模型检测 / 130 条规则）</td>
+                <td>辅助 LLM 语义分析 + OpenTelemetry GenAI 导出</td>
+              </tr>
+              <tr>
+                <td>可视化</td>
+                <td>事件 DB + 日志为主</td>
+                <td>Web UI：时间线 / 进程树 / 指标视图</td>
+              </tr>
+              <tr>
+                <td>性能</td>
+                <td>代理转发 + JSON 解析，CPU 开销低</td>
+                <td>优化 eBPF 采集，CPU 开销 &lt;3%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout">
+          <div class="callout-title">互补关系</div>
+          <p>AgentSight 的因果追踪（prompt → 行为 → 系统事实的关联）与 Web 可视化，正是 AgentGate 后续可借鉴的演进方向；AgentGate 的同步阻断与 AgentMoss 联动则是 AgentSight 不具备的防御能力。两者可共享 eBPF 采集基础设施，互为补充。</p>
+        </div>
+      </section>
+
+      <!-- Evolution -->
+      <section class="detail-section" id="evolution">
+        <div class="detail-section-tag">演进路线</div>
+        <h2 class="detail-section-title">后续可演进点</h2>
+        <p class="detail-section-desc">结合 AgentSight 的能力画像与 AARM 三层防御架构，AgentGate 有七个明确的演进方向。</p>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-icon">🔗</span>
+            <h3>1. 意图关联与因果追踪</h3>
+            <p>借鉴 AgentSight 因果引擎：以 <code>session_id</code> 为主键建立「prompt 意图 → tool_call 声明 → PTY 实际执行 → syscall 真实发生」的完整证据链，为 AgentMoss 的 L3 关联引擎提供结构化 parentEventIds 数据。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">🖥️</span>
+            <h3>2. 跨平台 L3 补齐</h3>
+            <p>macOS 可用 Endpoint Security Framework (ESF) / DTrace，Windows 可用 ETW 替代 eBPF，补齐 TS 版缺失的 L3 能力，实现「声明 → 执行 → 事实」三层全平台覆盖。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">📊</span>
+            <h3>3. 可视化与会话回放</h3>
+            <p>对标 AgentSight 的时间线 / 进程树 / 指标三视图，建设 AgentGate Dashboard：行为时间线回放、会话级事件流查看、阻断事件高亮，提升攻防演示与取证效率。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">📤</span>
+            <h3>4. 标准遥测导出</h3>
+            <p>参照 AgentSight 的 OpenTelemetry GenAI span 导出，将捕获的 LLM 调用转为 <code>gen_ai.*</code> 标准 span（OTLP/HTTP），无缝接入企业可观测性平台。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">⚡</span>
+            <h3>5. 性能与延迟优化</h3>
+            <p>SSE 流式响应改边收边解析（当前缓冲完整响应）；连接池 / 异步 IO；与 AgentSight 的 &lt;3% CPU 开销对标，量化网关转发开销。</p>
+          </div>
+          <div class="card">
+            <span class="card-icon">👥</span>
+            <h3>6. 多 Agent 关联与策略 DSL</h3>
+            <p>多 Agent 协作场景的跨会话关联（共享文件 / 共享凭证 / 事件因果链）；将 YAML 规则升级为更丰富的策略 DSL，支持条件组合与上下文敏感策略。</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 24px;">
+          <h3>7. 语义分析批量化（L1 网关侧预判）</h3>
+          <p>在网关侧对 tool_calls 做低成本语义预判（如 prompt 注入模式、敏感参数扫描），仅对可疑行为触发 AgentMoss 全量分析，降低 AgentMoss 分析负载与响应延迟——这是从「全量上报」走向「分级上报」的关键演进。</p>
+        </div>
+
+        <h3>版本演进脉络</h3>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>版本</th><th>数据源</th><th>核心方案</th><th>教训 / 价值</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>v1</td>
+                <td>Agent SDK 主动上报</td>
+                <td>GateClient 同步 HTTP 调用 /api/v1/analyze</td>
+                <td>需 Agent 集成 SDK，主动上报可被绕过</td>
+              </tr>
+              <tr>
+                <td>v2</td>
+                <td>eBPF syscall</td>
+                <td>内核 tracepoint 被动采集</td>
+                <td>WSL2 PID 不匹配、仅 Linux、需 root、语义层低</td>
+              </tr>
+              <tr>
+                <td>v3</td>
+                <td>LLM API payload（主）+ eBPF（可选）</td>
+                <td>mitmproxy 语义拦截 + PTY + eBPF 兜底</td>
+                <td>跨平台零侵入、高层语义、Fail-Closed</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="index.html">首页</a>
+      <a href="architecture.html">架构</a>
+      <a href="detection.html">检测方法</a>
+      <a href="detection-l1.html">L1 检测</a>
+      <a href="detection-l2-1.html">L2.1 检测</a>
+      <a href="detection-l2-2.html">L2.2 检测</a>
+      <a href="rules.html">规则集</a>
+      <a href="usage.html">使用指南</a>
+      <a href="aarm.html">AARM</a>
+      <a href="agentgate.html">AgentGate</a>
+    </div>
+    <p>AgentMoss — AI Agent 全链路运行时安全监控框架 · v0.1.0 · AgentGate — 系统层行为采集与安全分析网关</p>
+  </div>
+</footer>
+
+<script src="js/main.js"></script>
+</body>
+</html>
